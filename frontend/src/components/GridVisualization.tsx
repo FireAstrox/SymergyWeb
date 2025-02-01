@@ -59,7 +59,7 @@ const GridVisualization: React.FC = () => {
               <Tooltip />
               <Legend />
               <Line yAxisId="left" type="monotone" dataKey="power" stroke="#ff7300" name="Power (kW)" />
-              <Line yAxisId="right" type="monotone" dataKey="energy" stroke="#82ca9d" name="Energy (kWh)" />
+              <Line yAxisId="right" type="monotone" dataKey="energy" stroke="#030ffc" name="Energy (kWh)" />
             </LineChart>
           </ResponsiveContainer>
         </div>
