@@ -11,21 +11,22 @@ CORS(app)
 
 # Store component information
 components = {}
+components_loaded = False # Have we loaded the microgrid yet?
 
 # Store measurement history for each component
 MAX_HISTORY = 100
 measurements = defaultdict(lambda: {
-    "demand": deque(maxlen=MAX_HISTORY),
-    "voltage": deque(maxlen=MAX_HISTORY),
-    "power": deque(maxlen=MAX_HISTORY),
-    "energy": deque(maxlen=MAX_HISTORY),
-    "status": deque(maxlen=MAX_HISTORY),
+    "demand": deque(maxlen=MAX_HISTORY),  # Amps
+    "voltage": deque(maxlen=MAX_HISTORY), # Volts
+    "power": deque(maxlen=MAX_HISTORY),   # kW
+    "energy": deque(maxlen=MAX_HISTORY),  # kWh
+    "status": deque(maxlen=MAX_HISTORY),  # bool
     "timestamps": deque(maxlen=MAX_HISTORY)
 })
 
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
-    client.subscribe("symergygrid/#")
+    client.subscribe("symergygrid/#") # Sub to all incoming data (this may want to be changed)
 
 def on_message(client, userdata, msg):
     try:
@@ -35,23 +36,31 @@ def on_message(client, userdata, msg):
 
         # Handle meter structure message
         if topic == "symergygrid/meterstructure":
-            for component in payload["components"]:
-                components[component["id"]] = {
-                    "type": component["type"],
-                    "name": component.get("name", component["id"]),
-                    "coordinates": component["coordinates"]
-                }
-            print(f"Updated component information: {len(components)} components")
-            return
+            if not components_loaded:
+                components_loaded = True
+                for component in payload["components"]:
+                    components[component["id"]] = {
+                        "type": component["type"],
+                        "name": component.get("name", component["id"]),
+                        "coordinates": component["coordinates"],
+                        "connections": component["connections"]
+                    }
+                print(f"Updated component information: {len(components)} components")
+                return
+            else:
+                # We can handle prompting the user to change the component structure here.
+                print("Attempted to reload component structure after loaded.")
 
         # Handle component measurements
         # Example topic: symergygrid/components/generator1/demand
+        # This may need to be updated to handle metrics (a fifth subtopic)
         parts = topic.split('/')
         if len(parts) == 4 and parts[1] == "components":
             component_id = parts[2]
             measurement_type = parts[3]
 
             if component_id in components:
+                # Units for data will be assumed (even though it is part of the payload)
                 measurements[component_id][measurement_type].append(payload["value"])
                 measurements[component_id]["timestamps"].append(current_time)
                 print(f"Received {measurement_type} for {component_id}: {payload['value']}")
