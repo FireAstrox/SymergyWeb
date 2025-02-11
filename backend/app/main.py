@@ -26,7 +26,7 @@ measurements = defaultdict(lambda: {
 
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
-    client.subscribe("symergygrid/#") # Sub to all incoming data (this may want to be changed)
+    client.subscribe("#")  # Subscribe to all topics as per the new subscription pattern
 
 def on_message(client, userdata, msg):
     try:
@@ -34,47 +34,53 @@ def on_message(client, userdata, msg):
         payload = json.loads(msg.payload.decode())
         current_time = datetime.utcnow().isoformat()
 
-        # Handle meter structure message
-        if topic == "symergygrid/meterstructure":
-            if not components_loaded:
-                components_loaded = True
-                for component in payload["components"]:
-                    components[component["id"]] = {
-                        "type": component["type"],
-                        "name": component.get("name", component["id"]),
-                        "coordinates": component["coordinates"],
-                        "connections": component["connections"]
-                    }
-                print(f"Updated component information: {len(components)} components")
-                return
-            else:
-                # We can handle prompting the user to change the component structure here.
-                print("Attempted to reload component structure after loaded.")
-
         # Handle component measurements
-        # Example topic: symergygrid/components/generator1/demand
-        # This may need to be updated to handle metrics (a fifth subtopic)
         parts = topic.split('/')
-        if len(parts) == 4 and parts[1] == "components":
-            component_id = parts[2]
-            measurement_type = parts[3]
+        if len(parts) >= 4 and parts[1] == "components":
+            # For poles, the format is: symergygrid/components/misc/pole67/status
+            if parts[2] == "misc" and "pole" in parts[3]:
+                component_id = parts[3]  # Just use 'pole67' as the ID
+                measurement_type = parts[4]
+                
+                # Create component if it doesn't exist
+                if component_id not in components:
+                    components[component_id] = {
+                        "type": "misc",
+                        "category": "pole",
+                        "name": component_id,
+                        "coordinates": {"lat": 0, "lon": 0, "alt": 0},  # Default coordinates
+                        "connections": []
+                    }
 
-            if component_id in components:
-                # Units for data will be assumed (even though it is part of the payload)
-                measurements[component_id][measurement_type].append(payload["value"])
+                # Store the measurement
+                if measurement_type == "demand":
+                    measurements[component_id]["current"].append(payload["value"])
+                else:
+                    measurements[component_id][measurement_type].append(payload["value"])
                 measurements[component_id]["timestamps"].append(current_time)
                 print(f"Received {measurement_type} for {component_id}: {payload['value']}")
+            else:
+                # Handle other components (sources, loads)
+                component_id = f"{parts[2]}/{parts[3]}"
+                measurement_type = parts[4]
+                if component_id in components:
+                    if measurement_type == "demand":
+                        measurements[component_id]["current"].append(payload["value"])
+                    else:
+                        measurements[component_id][measurement_type].append(payload["value"])
+                    measurements[component_id]["timestamps"].append(current_time)
 
     except Exception as e:
         print(f"Error processing message: {e}")
 
-# Setup MQTT client
+# Setup MQTT client with credentials
 mqtt_client = mqtt.Client()
+mqtt_client.username_pw_set("symergyuser", "SymergyRox!")  # Set username and password
 mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 
 def start_mqtt():
-    mqtt_client.connect("test.mosquitto.org", 1883, 60)
+    mqtt_client.connect("sssn.us", 1883, 60)  # Update to new broker hostname
     mqtt_client.loop_forever()
 
 mqtt_thread = Thread(target=start_mqtt)

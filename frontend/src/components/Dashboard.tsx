@@ -3,8 +3,8 @@ import GridVisualization from './GridVisualization.tsx';
 
 const Dashboard: React.FC = () => {
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="bg-white shadow rounded-lg p-6">
+    <div className="w-full">
+      <div className="bg-white shadow rounded-lg p-6 w-full">
         <h2 className="text-xl font-semibold mb-4">Grid Status</h2>
         <GridVisualization />
       </div>
