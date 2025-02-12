@@ -1,6 +1,7 @@
 import React, { useEffect, useState, Fragment } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Dialog, Transition } from '@headlessui/react';
+import { ReactComponent as PoleIconSvg } from '../svg/pole_icon.svg';
 
 interface Coordinates {
   lat: number;
@@ -255,7 +256,14 @@ const getVoltageStatusColor = (voltage: number, isOnline: boolean): string => {
   return 'text-black';
 };
 
-// Update PoleStatus component to use the new color coding
+// Update the PoleIcon component with larger dimensions
+const PoleIcon: React.FC = () => (
+  <PoleIconSvg 
+    className="w-20 h-20 text-gray-400 absolute top-1 right-1" 
+  />
+);
+
+// Update PoleStatus component
 const PoleStatus: React.FC<{
   component: Component;
   measurements: ComponentMeasurements;
@@ -267,11 +275,11 @@ const PoleStatus: React.FC<{
   return (
     <>
       <div 
-        className="p-3 bg-white rounded shadow w-full cursor-pointer hover:shadow-md transition-shadow"
+        className="p-3 bg-white rounded shadow w-full cursor-pointer hover:shadow-md transition-shadow relative"
         onClick={() => setIsModalOpen(true)}
       >
         <div className="flex flex-col">
-          <h3 className="text-sm font-medium text-gray-900 mb-2">{component.name}</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-2 pr-8">{component.name}</h3>
           <div className="flex items-center mb-2">
             <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
               latestStatus 
@@ -292,6 +300,7 @@ const PoleStatus: React.FC<{
             </span>
           </div>
         </div>
+        <PoleIcon />
       </div>
 
       <PoleModal
