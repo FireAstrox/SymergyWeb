@@ -232,7 +232,30 @@ const PoleModal: React.FC<{
   );
 };
 
-// Update PoleStatus component to handle clicks
+// Add this constant for voltage thresholds (120V nominal system with percentage-based ranges)
+const VOLTAGE_THRESHOLDS = {
+  CRITICAL_HIGH: 132, // >110% (120V + 12V)
+  WARNING_HIGH: 126,  // >105% (120V + 6V)
+  NORMAL_HIGH: 120,   // 100% (nominal)
+  NORMAL_LOW: 114,    // >95% (120V - 6V)
+  WARNING_LOW: 108,   // >90% (120V - 12V)
+  CRITICAL_LOW: 0     // 0V or disconnected
+};
+
+// Add a helper function to determine voltage status color
+const getVoltageStatusColor = (voltage: number, isOnline: boolean): string => {
+  if (!isOnline) return 'text-black'; // Offline/Disconnected
+  if (voltage === 0) return 'text-black';
+  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_HIGH) return 'text-red-600';
+  if (voltage > VOLTAGE_THRESHOLDS.WARNING_HIGH) return 'text-orange-500';
+  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_HIGH) return 'text-green-600';
+  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_LOW) return 'text-green-600';
+  if (voltage > VOLTAGE_THRESHOLDS.WARNING_LOW) return 'text-yellow-500';
+  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_LOW) return 'text-red-600';
+  return 'text-black';
+};
+
+// Update PoleStatus component to use the new color coding
 const PoleStatus: React.FC<{
   component: Component;
   measurements: ComponentMeasurements;
@@ -253,18 +276,18 @@ const PoleStatus: React.FC<{
             <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
               latestStatus 
                 ? 'bg-green-500'
-                : 'bg-red-500'
+                : 'bg-black'
             }`} />
             <span className={`text-xs px-2 py-0.5 rounded-full ${
               latestStatus 
                 ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
+                : 'bg-gray-100 text-black'
             }`}>
               {latestStatus ? 'Online' : 'Offline'}
             </span>
           </div>
           <div className="flex items-center">
-            <span className="text-sm font-medium text-gray-900">
+            <span className={`text-sm font-medium ${getVoltageStatusColor(latestVoltage, latestStatus)}`}>
               {latestVoltage.toFixed(1)} V
             </span>
           </div>
