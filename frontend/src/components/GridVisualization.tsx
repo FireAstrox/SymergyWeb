@@ -323,7 +323,8 @@ const GridVisualization: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/grid/data`);
+        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${API_URL}/api/grid/data`);
         const data = await response.json();
         setGridData(data);
       } catch (error) {

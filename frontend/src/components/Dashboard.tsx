@@ -1,5 +1,5 @@
 import React from 'react';
-import GridVisualization from './GridVisualization.tsx';
+import GridVisualization from './GridVisualization';
 
 const Dashboard: React.FC = () => {
   return (
