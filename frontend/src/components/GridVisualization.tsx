@@ -249,10 +249,10 @@ const getVoltageStatusColor = (voltage: number, isOnline: boolean): string => {
   if (voltage === 0) return 'text-black';
   if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_HIGH) return 'text-red-600';
   if (voltage > VOLTAGE_THRESHOLDS.WARNING_HIGH) return 'text-orange-500';
-  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_HIGH) return 'text-green-600';
+  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_HIGH) return 'text-yellow-500';
   if (voltage > VOLTAGE_THRESHOLDS.NORMAL_LOW) return 'text-green-600';
-  if (voltage > VOLTAGE_THRESHOLDS.WARNING_LOW) return 'text-yellow-500';
-  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_LOW) return 'text-red-600';
+  if (voltage > VOLTAGE_THRESHOLDS.WARNING_LOW) return 'text-teal-500';
+  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_LOW) return 'text-cyan-600';
   return 'text-black';
 };
 
