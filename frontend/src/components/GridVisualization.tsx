@@ -69,25 +69,37 @@ const ComponentGraph: React.FC<{
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Power Graph */}
         <div className="h-[300px]">
-          <h4 className="text-sm font-medium mb-2">Power & Energy</h4>
+          <h4 className="text-sm font-medium mb-2">Power</h4>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="timestamp" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
+              <YAxis />
               <Tooltip />
               <Legend />
               <Line 
-                yAxisId="left" 
                 type="monotone" 
                 dataKey="power" 
                 stroke={color} 
                 name="Power (kW)" 
               />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Energy Graph */}
+        <div className="h-[300px]">
+          <h4 className="text-sm font-medium mb-2">Energy</h4>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="timestamp" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
               <Line 
-                yAxisId="right" 
                 type="monotone" 
                 dataKey="energy" 
                 stroke="#030ffc" 
@@ -97,6 +109,7 @@ const ComponentGraph: React.FC<{
           </ResponsiveContainer>
         </div>
 
+        {/* Voltage & Current Graph */}
         <div className="h-[300px]">
           <h4 className="text-sm font-medium mb-2">Voltage & Current</h4>
           <ResponsiveContainer width="100%" height="100%">
@@ -156,16 +169,24 @@ const ComponentGraph: React.FC<{
   );
 };
 
-// Add a new PoleModal component
+// Update the PoleModal component to only show voltage for poles
 const PoleModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   component: Component;
   measurements: ComponentMeasurements;
 }> = ({ isOpen, onClose, component, measurements }) => {
+  // Format data for the last 5 minutes (assuming 1-second intervals)
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  
   const chartData = measurements.timestamps.map((timestamp, index) => ({
-    timestamp: new Date(timestamp).toLocaleTimeString(),
+    timestamp: new Date(timestamp),
     voltage: measurements.voltage[index],
+  }))
+  .filter(data => data.timestamp > fiveMinutesAgo)
+  .map(data => ({
+    ...data,
+    timestamp: data.timestamp.toLocaleTimeString(),
   }));
 
   return (
@@ -194,10 +215,11 @@ const PoleModal: React.FC<{
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
                 <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900 mb-4">
-                  {component.name} - Voltage History
+                  {component.name} - Voltage History (Last 5 Minutes)
                 </Dialog.Title>
+                
                 <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
@@ -215,6 +237,7 @@ const PoleModal: React.FC<{
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
+
                 <div className="mt-4 flex justify-end">
                   <button
                     type="button"
