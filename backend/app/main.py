@@ -48,7 +48,7 @@ def on_message(client, userdata, msg):
                         "type": "misc",
                         "category": "pole",
                         "name": component_id,
-                        "coordinates": {"lat": 0, "lon": 0, "alt": 0},  # Default coordinates
+                        "coordinates": {"lat": 0, "lon": 0, "alt": 0},
                         "connections": []
                     }
 
@@ -59,16 +59,34 @@ def on_message(client, userdata, msg):
                     measurements[component_id][measurement_type].append(payload["value"])
                 measurements[component_id]["timestamps"].append(current_time)
                 print(f"Received {measurement_type} for {component_id}: {payload['value']}")
-            else:
-                # Handle other components (sources, loads)
-                component_id = f"{parts[2]}/{parts[3]}"
+            
+            # Handle sources (format: symergygrid/components/sources/generator0/status)
+            elif parts[2] == "sources":
+                component_id = f"sources/{parts[3]}"  # e.g., "sources/generator0"
                 measurement_type = parts[4]
-                if component_id in components:
-                    if measurement_type == "demand":
-                        measurements[component_id]["current"].append(payload["value"])
-                    else:
-                        measurements[component_id][measurement_type].append(payload["value"])
-                    measurements[component_id]["timestamps"].append(current_time)
+                
+                # Create source component if it doesn't exist
+                if component_id not in components:
+                    # Determine category from the component name
+                    category = next((cat for cat in ["generator", "turbine", "solar", "hydro"] 
+                                  if cat in parts[3]), "other")
+                    
+                    components[component_id] = {
+                        "type": "source",
+                        "category": category,
+                        "name": parts[3].capitalize(),  # e.g., "Generator0"
+                        "coordinates": {"lat": 0, "lon": 0, "alt": 0},
+                        "connections": []
+                    }
+
+                # Store the measurement
+                if measurement_type == "demand":
+                    measurements[component_id]["demand"].append(payload["value"])
+                    measurements[component_id]["current"].append(payload["value"])  # Store in both places
+                else:
+                    measurements[component_id][measurement_type].append(payload["value"])
+                measurements[component_id]["timestamps"].append(current_time)
+                print(f"Received {measurement_type} for {component_id}: {payload['value']}")
 
     except Exception as e:
         print(f"Error processing message: {e}")

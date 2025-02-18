@@ -263,6 +263,85 @@ const PoleIcon: React.FC = () => (
   />
 );
 
+// Add this before the SourceStatus component
+const getSourceColor = (category: string): string => {
+  switch (category.toLowerCase()) {
+    case 'hydro':
+      return COLORS.source.hydro;
+    case 'solar':
+      return COLORS.source.solar;
+    case 'turbine':
+      return COLORS.source.wind;
+    case 'generator':
+      return COLORS.source.diesel;
+    default:
+      return '#666666';
+  }
+};
+
+// Update the SourceStatus component
+const SourceStatus: React.FC<{
+  component: Component;
+  measurements: ComponentMeasurements;
+}> = ({ component, measurements }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const latestStatus = measurements?.status?.[measurements.status.length - 1] ?? true;
+  const latestVoltage = measurements?.voltage?.[measurements.voltage.length - 1] ?? 0;
+  const latestPower = measurements?.power?.[measurements.power.length - 1] ?? 0;
+  const latestEnergy = measurements?.energy?.[measurements.energy.length - 1] ?? 0;
+  const latestCurrent = measurements?.current?.[measurements.current.length - 1] ?? 0;
+  const sourceColor = getSourceColor(component.category);
+  
+  return (
+    <>
+      <div 
+        className="p-3 bg-white rounded shadow w-full cursor-pointer hover:shadow-md transition-shadow relative"
+        onClick={() => setIsModalOpen(true)}
+      >
+        <div className="flex flex-col">
+          <h3 className="text-sm font-medium text-gray-900 mb-2 pr-8">{component.name}</h3>
+          <div className="flex items-center mb-2">
+            <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
+              latestStatus 
+                ? 'bg-green-500'
+                : 'bg-black'
+            }`} />
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              latestStatus 
+                ? 'bg-green-100 text-green-800'
+                : 'bg-gray-100 text-black'
+            }`}>
+              {latestStatus ? 'Online' : 'Offline'}
+            </span>
+          </div>
+          <div className="flex flex-col space-y-1">
+            <span className={`text-sm font-medium ${getVoltageStatusColor(latestVoltage, latestStatus)}`}>
+              {latestVoltage.toFixed(1)} V
+            </span>
+            <span className="text-sm font-medium" style={{ color: sourceColor }}>
+              {latestPower.toFixed(1)} kW
+            </span>
+            <span className="text-sm font-medium text-gray-600">
+              {latestEnergy.toFixed(1)} kWh
+            </span>
+            <span className="text-sm font-medium text-gray-600">
+              {latestCurrent.toFixed(1)} A
+            </span>
+          </div>
+        </div>
+        <PoleIcon />
+      </div>
+
+      <PoleModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        component={component}
+        measurements={measurements}
+      />
+    </>
+  );
+};
+
 // Update PoleStatus component
 const PoleStatus: React.FC<{
   component: Component;
@@ -319,6 +398,7 @@ const GridVisualization: React.FC = () => {
     measurements: {}
   });
   const [isDistributionExpanded, setIsDistributionExpanded] = useState(false);
+  const [isSourcesExpanded, setIsSourcesExpanded] = useState(true); // Default to open
 
   useEffect(() => {
     const fetchData = async () => {
@@ -337,15 +417,24 @@ const GridVisualization: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Update component grouping
+  // Update the sourceComponents grouping to handle the full path ID
   const sourceComponents = Object.entries(gridData.components)
-    .filter(([_, component]) => component.type === 'source')
+    .filter(([id, component]) => {
+      // Debug log to see what components we're getting
+      console.log('Component:', id, component);
+      return id.includes('sources/');
+    })
     .reduce((acc, [id, component]) => {
-      const category = component.category || 'other';
+      // Extract category from the ID (solar, hydro, turbine, generator)
+      const parts = id.split('/');
+      const category = parts[parts.length - 2] || 'other'; // Get the category from the path
       if (!acc[category]) acc[category] = [];
       acc[category].push([id, component]);
       return acc;
     }, {} as Record<string, [string, Component][]>);
+
+  // Add debug log to see what sourceComponents contains
+  console.log('Source Components:', sourceComponents);
 
   const loadComponents = Object.entries(gridData.components)
     .filter(([_, component]) => component.type === 'load');
@@ -361,23 +450,58 @@ const GridVisualization: React.FC = () => {
     });
 
   return (
-    <div className="p-4 w-full">
-      <h2 className="text-xl font-bold mb-6">Generation Sources</h2>
-      {Object.entries(sourceComponents).map(([category, components]) => (
-        <div key={category}>
-          <h3 className="text-lg font-semibold my-4 capitalize">{category}</h3>
-          <div className="space-y-6">
-            {components.map(([id, component]) => (
-              <ComponentGraph
-                key={id}
-                component={component}
-                measurements={gridData.measurements[id]}
-                color={COLORS.source[component.category as keyof typeof COLORS.source] || COLORS.source.diesel}
-              />
+    <div className="p-4 w-full space-y-6">
+      <div className="border rounded-lg bg-white shadow">
+        <button
+          onClick={() => setIsSourcesExpanded(!isSourcesExpanded)}
+          className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50"
+        >
+          <h2 className="text-xl font-bold">
+            Generation Sources ({Object.values(sourceComponents).flat().length} sources)
+          </h2>
+          <svg
+            className={`w-6 h-6 transform transition-transform ${
+              isSourcesExpanded ? 'rotate-180' : ''
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+        
+        {isSourcesExpanded && (
+          <div className="p-6 border-t">
+            {Object.entries(sourceComponents).map(([category, components]) => (
+              <div key={category} className="mb-6 last:mb-0">
+                <h3 className="text-lg font-semibold mb-4 capitalize">{category}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+                  {components.map(([id, component]) => (
+                    <SourceStatus
+                      key={id}
+                      component={component}
+                      measurements={gridData.measurements[id] || {
+                        status: [true],
+                        timestamps: [],
+                        voltage: [0],
+                        current: [],
+                        power: [0],
+                        energy: []
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
-        </div>
-      ))}
+        )}
+      </div>
 
       <h2 className="text-xl font-bold my-6">Loads</h2>
       <div className="space-y-6">
