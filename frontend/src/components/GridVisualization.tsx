@@ -138,6 +138,7 @@ const ComponentGraph: React.FC<{
           </ResponsiveContainer>
         </div>
 
+        {/* Metrics Display */}
         <div className="lg:col-span-2 grid grid-cols-4 gap-4">
           <div className="p-3 bg-white rounded shadow">
             <p className="text-sm text-gray-500">Latest Voltage</p>
@@ -169,7 +170,7 @@ const ComponentGraph: React.FC<{
   );
 };
 
-// Update the PoleModal component to only show voltage for poles
+// Update PoleModal component to also separate Power and Energy graphs
 const PoleModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -182,6 +183,9 @@ const PoleModal: React.FC<{
   const chartData = measurements.timestamps.map((timestamp, index) => ({
     timestamp: new Date(timestamp),
     voltage: measurements.voltage[index],
+    current: measurements.current[index],
+    power: measurements.power[index],
+    energy: measurements.energy[index]
   }))
   .filter(data => data.timestamp > fiveMinutesAgo)
   .map(data => ({
@@ -217,25 +221,89 @@ const PoleModal: React.FC<{
             >
               <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
                 <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900 mb-4">
-                  {component.name} - Voltage History (Last 5 Minutes)
+                  {component.name} - Metrics History (Last 5 Minutes)
                 </Dialog.Title>
                 
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="timestamp" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="voltage"
-                        stroke="#8884d8"
-                        name="Voltage (V)"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Power Graph */}
+                  <div className="h-[250px]">
+                    <h4 className="text-sm font-medium mb-2">Power History</h4>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="timestamp" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="power"
+                          stroke="#ff7300"
+                          name="Power (kW)"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Energy Graph */}
+                  <div className="h-[250px]">
+                    <h4 className="text-sm font-medium mb-2">Energy History</h4>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="timestamp" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="energy"
+                          stroke="#0088fe"
+                          name="Energy (kWh)"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Voltage Graph */}
+                  <div className="h-[250px]">
+                    <h4 className="text-sm font-medium mb-2">Voltage History</h4>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="timestamp" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="voltage"
+                          stroke="#8884d8"
+                          name="Voltage (V)"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Current Graph */}
+                  <div className="h-[250px]">
+                    <h4 className="text-sm font-medium mb-2">Current History</h4>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="timestamp" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="current"
+                          stroke="#82ca9d"
+                          name="Current (A)"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
 
                 <div className="mt-4 flex justify-end">
