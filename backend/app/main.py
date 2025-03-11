@@ -87,6 +87,38 @@ def on_message(client, userdata, msg):
                     measurements[component_id][measurement_type].append(payload["value"])
                 measurements[component_id]["timestamps"].append(current_time)
                 print(f"Received {measurement_type} for {component_id}: {payload['value']}")
+                
+            # Handle loads (format: symergygrid/components/loads/residential0/status)
+            elif parts[2] == "loads":
+                component_id = f"loads/{parts[3]}"  # e.g., "loads/residential0"
+                measurement_type = parts[4]
+                
+                # Create load component if it doesn't exist
+                if component_id not in components:
+                    # Determine category from the component name
+                    if "residential" in parts[3]:
+                        category = "residential"
+                        display_name = f"Residential {parts[3].replace('residential', '')}"
+                    else:
+                        category = "commercial"
+                        display_name = parts[3].replace('_', ' ').title()
+                    
+                    components[component_id] = {
+                        "type": "load",
+                        "category": category,
+                        "name": display_name,
+                        "coordinates": {"lat": 0, "lon": 0, "alt": 0},
+                        "connections": []
+                    }
+
+                # Store the measurement
+                if measurement_type == "demand":
+                    measurements[component_id]["demand"].append(payload["value"])
+                    measurements[component_id]["current"].append(payload["value"])  # Store in both places
+                else:
+                    measurements[component_id][measurement_type].append(payload["value"])
+                measurements[component_id]["timestamps"].append(current_time)
+                print(f"Received {measurement_type} for {component_id}: {payload['value']}")
 
     except Exception as e:
         print(f"Error processing message: {e}")
@@ -107,7 +139,7 @@ mqtt_thread.start()
 
 @app.route('/health')
 def health_check():
-    return jsonify({"status": "healthy"})
+    return jsonify({"status": "ok", "components_loaded": components_loaded})
 
 @app.route('/api/grid/data')
 def get_grid_data():

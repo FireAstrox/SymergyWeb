@@ -2,6 +2,9 @@ import React, { useEffect, useState, Fragment } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Dialog, Transition } from '@headlessui/react';
 import { ReactComponent as PoleIconSvg } from '../svg/pole_icon.svg';
+import { ReactComponent as HydroIconSvg } from '../svg/hydro.svg';
+import { ReactComponent as SolarIconSvg } from '../svg/solar.svg';
+import { ReactComponent as WindIconSvg } from '../svg/wind_icon.svg';
 
 interface Coordinates {
   lat: number;
@@ -354,23 +357,38 @@ const PoleIcon: React.FC = () => (
   />
 );
 
-// Add this before the SourceStatus component
+// Create a component for the Hydro icon
+const HydroIcon: React.FC = () => (
+  <HydroIconSvg 
+    className="w-16 h-16 text-blue-500 absolute top-2 right-2" 
+  />
+);
+
+// Create a component for the Solar icon
+const SolarIcon: React.FC = () => (
+  <SolarIconSvg 
+    className="w-16 h-16 text-yellow-500 absolute top-2 right-2" 
+  />
+);
+
+// Create a component for the Wind icon with adjusted positioning
+const WindIcon: React.FC = () => (
+  <WindIconSvg 
+    className="w-24 h-24 text-cyan-500 absolute -top-2 -right-2 transform scale-150" 
+  />
+);
+
+// Helper function to get source color based on category
 const getSourceColor = (category: string): string => {
-  switch (category.toLowerCase()) {
-    case 'hydro':
-      return COLORS.source.hydro;
-    case 'solar':
-      return COLORS.source.solar;
-    case 'turbine':
-      return COLORS.source.wind;
-    case 'generator':
-      return COLORS.source.diesel;
-    default:
-      return '#666666';
-  }
+  const lowerCategory = category.toLowerCase();
+  if (lowerCategory.includes('hydro')) return COLORS.source.hydro;
+  if (lowerCategory.includes('solar')) return COLORS.source.solar;
+  if (lowerCategory.includes('wind')) return COLORS.source.wind;
+  if (lowerCategory.includes('diesel') || lowerCategory.includes('generator')) return COLORS.source.diesel;
+  return '#666666'; // Default gray
 };
 
-// Update the SourceStatus component
+// Update the SourceStatus component to use custom icons based on category
 const SourceStatus: React.FC<{
   component: Component;
   measurements: ComponentMeasurements;
@@ -381,7 +399,25 @@ const SourceStatus: React.FC<{
   const latestPower = measurements?.power?.[measurements.power.length - 1] ?? 0;
   const latestEnergy = measurements?.energy?.[measurements.energy.length - 1] ?? 0;
   const latestCurrent = measurements?.current?.[measurements.current.length - 1] ?? 0;
+  
+  // Get the color based on the source category
   const sourceColor = getSourceColor(component.category);
+  
+  // Determine which icon to show based on category
+  const renderSourceIcon = () => {
+    switch (component.category.toLowerCase()) {
+      case 'hydro':
+        return <HydroIcon />;
+      case 'solar':
+        return <SolarIcon />;
+      case 'wind':
+      case 'turbine':
+        return <WindIcon />;
+      // We'll add more cases as we implement other icons
+      default:
+        return null;
+    }
+  };
   
   return (
     <>
@@ -390,7 +426,7 @@ const SourceStatus: React.FC<{
         onClick={() => setIsModalOpen(true)}
       >
         <div className="flex flex-col">
-          <h3 className="text-sm font-medium text-gray-900 mb-2 pr-8">{component.name}</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-2">{component.name}</h3>
           <div className="flex items-center mb-2">
             <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
               latestStatus 
@@ -420,7 +456,9 @@ const SourceStatus: React.FC<{
             </span>
           </div>
         </div>
-        <PoleIcon />
+        
+        {/* Render the appropriate icon */}
+        {renderSourceIcon()}
       </div>
 
       <PoleModal
@@ -575,6 +613,67 @@ const PoleVoltageModal: React.FC<{
   );
 };
 
+// Add this component for a compact view of loads
+const LoadStatus: React.FC<{
+  component: Component;
+  measurements: ComponentMeasurements;
+}> = ({ component, measurements }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const latestStatus = measurements?.status?.[measurements.status.length - 1] ?? true;
+  const latestVoltage = measurements?.voltage?.[measurements.voltage.length - 1] ?? 0;
+  const latestPower = measurements?.power?.[measurements.power.length - 1] ?? 0;
+  const latestEnergy = measurements?.energy?.[measurements.energy.length - 1] ?? 0;
+  const latestCurrent = measurements?.current?.[measurements.current.length - 1] ?? 0;
+  
+  return (
+    <>
+      <div 
+        className="p-3 bg-white rounded shadow w-full cursor-pointer hover:shadow-md transition-shadow"
+        onClick={() => setIsModalOpen(true)}
+      >
+        <div className="flex flex-col">
+          <h3 className="text-sm font-medium text-gray-900 mb-2">{component.name}</h3>
+          <div className="flex items-center mb-2">
+            <div className={`h-2.5 w-2.5 rounded-full mr-2 ${
+              latestStatus 
+                ? 'bg-green-500'
+                : 'bg-black'
+            }`} />
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              latestStatus 
+                ? 'bg-green-100 text-green-800'
+                : 'bg-gray-100 text-black'
+            }`}>
+              {latestStatus ? 'Online' : 'Offline'}
+            </span>
+          </div>
+          <div className="flex flex-col space-y-1">
+            <span className={`text-sm font-medium ${getVoltageStatusColor(latestVoltage, latestStatus)}`}>
+              {latestVoltage.toFixed(1)} V
+            </span>
+            <span className="text-sm font-medium text-green-600">
+              {latestPower.toFixed(1)} kW
+            </span>
+            <span className="text-sm font-medium text-gray-600">
+              {latestEnergy.toFixed(1)} kWh
+            </span>
+            <span className="text-sm font-medium text-gray-600">
+              {latestCurrent.toFixed(1)} A
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <PoleModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        component={component}
+        measurements={measurements}
+      />
+    </>
+  );
+};
+
 const GridVisualization: React.FC = () => {
   const [gridData, setGridData] = useState<GridData>({
     components: {},
@@ -582,6 +681,7 @@ const GridVisualization: React.FC = () => {
   });
   const [isDistributionExpanded, setIsDistributionExpanded] = useState(false);
   const [isSourcesExpanded, setIsSourcesExpanded] = useState(true); // Default to open
+  const [isLoadsExpanded, setIsLoadsExpanded] = useState(true); // Default to open
 
   useEffect(() => {
     const fetchData = async () => {
@@ -619,8 +719,30 @@ const GridVisualization: React.FC = () => {
   // Add debug log to see what sourceComponents contains
   console.log('Source Components:', sourceComponents);
 
+  // Update the loadComponents filtering
   const loadComponents = Object.entries(gridData.components)
-    .filter(([_, component]) => component.type === 'load');
+    .filter(([id, component]) => component.type === 'load')
+    .sort(([idA], [idB]) => {
+      // Sort residential loads by their number
+      if (idA.includes('residential') && idB.includes('residential')) {
+        const numA = parseInt(idA.replace(/\D/g, ''));
+        const numB = parseInt(idB.replace(/\D/g, ''));
+        return numA - numB;
+      }
+      // Put commercial loads first
+      if (!idA.includes('residential') && idB.includes('residential')) return -1;
+      if (idA.includes('residential') && !idB.includes('residential')) return 1;
+      // Alphabetical sort for other loads
+      return idA.localeCompare(idB);
+    });
+
+  // Group load components by category
+  const loadComponentsByCategory = loadComponents.reduce((acc, [id, component]) => {
+    const category = component.category || 'other';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push([id, component]);
+    return acc;
+  }, {} as Record<string, [string, Component][]>);
 
   // Update the miscComponents filtering
   const miscComponents = Object.entries(gridData.components)
@@ -686,16 +808,56 @@ const GridVisualization: React.FC = () => {
         )}
       </div>
 
-      <h2 className="text-xl font-bold my-6">Loads</h2>
-      <div className="space-y-6">
-        {loadComponents.map(([id, component]) => (
-          <ComponentGraph
-            key={id}
-            component={component}
-            measurements={gridData.measurements[id]}
-            color={COLORS.load}
-          />
-        ))}
+      <div className="border rounded-lg bg-white shadow mt-6">
+        <button
+          onClick={() => setIsLoadsExpanded(!isLoadsExpanded)}
+          className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50"
+        >
+          <h2 className="text-xl font-bold">
+            Loads ({loadComponents.length} components)
+          </h2>
+          <svg
+            className={`w-6 h-6 transform transition-transform ${
+              isLoadsExpanded ? 'rotate-180' : ''
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+        
+        {isLoadsExpanded && (
+          <div className="p-6 border-t">
+            {Object.entries(loadComponentsByCategory).map(([category, components]) => (
+              <div key={category} className="mb-6 last:mb-0">
+                <h3 className="text-lg font-semibold mb-4 capitalize">{category}</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+                  {components.map(([id, component]) => (
+                    <LoadStatus
+                      key={id}
+                      component={component}
+                      measurements={gridData.measurements[id] || {
+                        status: [true],
+                        timestamps: [],
+                        voltage: [0],
+                        current: [0],
+                        power: [0],
+                        energy: [0]
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="border rounded-lg bg-white shadow">
