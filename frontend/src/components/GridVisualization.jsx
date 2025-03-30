@@ -1,0 +1,288 @@
+import React, { useState, useEffect, memo } from 'react';
+import { PlusIcon } from '@heroicons/react/24/outline';
+
+// Add voltage thresholds
+const VOLTAGE_THRESHOLDS = {
+  CRITICAL_HIGH: 132, // >110% (120V + 12V)
+  WARNING_HIGH: 126,  // >105% (120V + 6V)
+  NORMAL_HIGH: 120,   // 100% (nominal)
+  NORMAL_LOW: 114,    // >95% (120V - 6V)
+  WARNING_LOW: 108,   // >90% (120V - 12V)
+  CRITICAL_LOW: 0     // 0V or disconnected
+};
+
+// Add helper function for voltage color
+const getVoltageStatusColor = (voltage, isOnline) => {
+  if (!isOnline) return 'text-black';
+  if (voltage === 0) return 'text-black';
+  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_HIGH) return 'text-red-600';
+  if (voltage > VOLTAGE_THRESHOLDS.WARNING_HIGH) return 'text-orange-500';
+  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_HIGH) return 'text-yellow-500';
+  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_LOW) return 'text-green-600';
+  if (voltage > VOLTAGE_THRESHOLDS.WARNING_LOW) return 'text-teal-500';
+  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_LOW) return 'text-cyan-600';
+  return 'text-black';
+};
+
+const ComponentCard = ({ name, status, power, voltage, demand, isPole }) => {
+  const voltageColor = getVoltageStatusColor(voltage, status);
+  
+  return (
+    <div className={`p-3 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4`}>
+      <div className="flex justify-between items-center">
+        <h3 className="font-semibold">{name}</h3>
+        {isPole ? (
+          <div className="flex items-center">
+            <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'} mr-2`} />
+            <span className={`text-sm px-2 py-0.5 rounded-full ${status ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+              {status ? 'Online' : 'Offline'}
+            </span>
+          </div>
+        ) : (
+          <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
+        )}
+      </div>
+      <div className="text-sm mt-1">
+        {isPole ? (
+          <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
+        ) : (
+          <>
+            <div>Power: {power?.toFixed(2)} kW</div>
+            <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
+            <div>Current: {demand?.toFixed(2)} A</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const GridVisualization = ({ section }) => {
+  const [gridData, setGridData] = useState({
+    components: {},
+    measurements: {}
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    let fetchController = null;
+    
+    const fetchData = async () => {
+      if (!isMounted) return;
+      
+      // Cancel any pending requests
+      if (fetchController) {
+        fetchController.abort();
+      }
+      
+      // Create a new AbortController for this request
+      fetchController = new AbortController();
+      
+      try {
+        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const timestamp = new Date().getTime(); // Add cache-busting timestamp
+        const response = await fetch(`${API_URL}/api/grid/data?t=${timestamp}`, {
+          signal: fetchController.signal,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (isMounted) {
+          setGridData(data);
+        }
+      } catch (error) {
+        // Only log errors that aren't from aborting
+        if (error.name !== 'AbortError') {
+          console.error('Error fetching grid data:', error);
+        }
+      }
+    };
+
+    // Initial fetch
+    fetchData();
+    
+    // Use a more reliable polling mechanism with health check
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 500);
+    
+    // Add a health check interval that will force refresh if needed
+    const healthCheckId = setInterval(() => {
+      const now = new Date().getTime();
+      const lastUpdateTime = window._lastGridDataUpdate || 0;
+      
+      // If we haven't had an update in 5 seconds, force a page refresh
+      if (now - lastUpdateTime > 5000 && lastUpdateTime !== 0) {
+        console.log("Data updates appear stuck, refreshing...");
+        window.location.reload();
+      }
+      
+      // Record this health check
+      window._lastGridDataUpdate = now;
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      clearInterval(healthCheckId);
+      if (fetchController) {
+        fetchController.abort();
+      }
+    };
+  }, []);
+
+  // Record when we get data
+  useEffect(() => {
+    window._lastGridDataUpdate = new Date().getTime();
+  }, [gridData]);
+
+  // Filter and group components by their type and category from the structure
+  const groupedComponents = Object.entries(gridData.components).reduce((acc, [id, component]) => {
+    // For loads, we want to use the actual component type and category
+    if (component.type === 'load') {
+      if (!acc.load) acc.load = {};
+      if (!acc.load[component.category]) acc.load[component.category] = [];
+      acc.load[component.category].push([id, component]);
+    }
+    // For poles - check if the ID contains 'pole'
+    else if (id.includes('pole')) {  // Changed condition to check ID
+      if (!acc.none) acc.none = {};
+      if (!acc.none.pole) acc.none.pole = [];
+      acc.none.pole.push([id, component]);
+    }
+    // For sources
+    else if (component.type === 'source') {
+      if (!acc.source) acc.source = {};
+      if (!acc.source[component.category]) acc.source[component.category] = [];
+      acc.source[component.category].push([id, component]);
+    }
+    return acc;
+  }, {});
+
+  // Sort components within each category
+  Object.values(groupedComponents).forEach(typeGroup => {
+    Object.values(typeGroup).forEach(components => {
+      components.sort(([idA, compA], [idB, compB]) => {
+        // Extract numbers for numerical sorting
+        const numA = parseInt(compA.name.match(/\d+/)?.[0] || '0');
+        const numB = parseInt(compB.name.match(/\d+/)?.[0] || '0');
+        return numA - numB;
+      });
+    });
+  });
+
+  // Sort categories in specific order for loads
+  const loadCategoryOrder = {
+    'municipal': 1,
+    'commercial': 2,
+    'residential': 3,
+    'industrial': 4
+  };
+
+  // Add memo to prevent unnecessary re-renders of ComponentCard
+  const MemoizedComponentCard = React.memo(ComponentCard, (prevProps, nextProps) => {
+    return (
+      prevProps.status === nextProps.status &&
+      prevProps.voltage === nextProps.voltage &&
+      prevProps.power === nextProps.power &&
+      prevProps.demand === nextProps.demand
+    );
+  });
+
+  // Update createComponentCard to use memoized version
+  const createComponentCard = (id, component) => {
+    const measurements = gridData.measurements[id] || {
+      status: [true],
+      timestamps: [],
+      voltage: [0],
+      current: [0],
+      power: [0],
+      energy: [0]
+    };
+    const lastIndex = measurements.status?.length - 1;
+    const isPole = id.includes('pole');
+
+    return (
+      <MemoizedComponentCard
+        key={id}
+        name={component.name}
+        status={measurements.status?.[lastIndex] ?? false}
+        power={measurements.power?.[lastIndex] ?? 0}
+        voltage={measurements.voltage?.[lastIndex] ?? 0}
+        demand={measurements.current?.[lastIndex] ?? 0}
+        isPole={isPole}
+      />
+    );
+  };
+
+  const renderSection = () => {
+    switch (section) {
+      case 'poles':
+        const poles = groupedComponents.none?.pole || [];
+        return (
+          <div className="grid grid-cols-1 gap-4">
+            {poles.length > 0 ? (
+              poles.map(([id, component]) => createComponentCard(id, component))
+            ) : (
+              <div className="text-navy-900">No poles found</div>
+            )}
+          </div>
+        );
+
+      case 'loads':
+        const loadCategories = groupedComponents.load || {};
+        const sortedLoadCategories = Object.entries(loadCategories)
+          .sort(([catA], [catB]) => 
+            (loadCategoryOrder[catA] || 999) - (loadCategoryOrder[catB] || 999)
+          );
+
+        return (
+          <div>
+            {sortedLoadCategories.map(([category, components]) => (
+              <div key={category} className="mb-6 last:mb-0">
+                <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {components.map(([id, component]) => createComponentCard(id, component))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'sources':
+        const sourceCategories = groupedComponents.source || {};
+        return (
+          <div>
+            {Object.entries(sourceCategories).map(([category, components]) => (
+              <div key={category} className="mb-6 last:mb-0">
+                <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  {components.map(([id, component]) => createComponentCard(id, component))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="w-full h-full">
+      {renderSection()}
+    </div>
+  );
+};
+
+export default GridVisualization; 

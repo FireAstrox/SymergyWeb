@@ -5,6 +5,7 @@ import json
 from threading import Thread
 from collections import defaultdict, deque
 from datetime import datetime
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -26,7 +27,14 @@ measurements = defaultdict(lambda: {
 
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
-    client.subscribe("#")  # Subscribe to all topics as per the new subscription pattern
+    # More specific subscription instead of "#" which is too broad
+    client.subscribe("symergygrid/components/+/+/+")
+    print("Subscribed to component topics")
+
+def on_disconnect(client, userdata, rc):
+    print(f"Disconnected with result code {rc}")
+    print("Attempting to reconnect...")
+    # Will automatically try to reconnect
 
 def on_message(client, userdata, msg):
     try:
@@ -123,15 +131,22 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Error processing message: {e}")
 
-# Setup MQTT client with credentials
-mqtt_client = mqtt.Client()
-mqtt_client.username_pw_set("symergyuser", "SymergyRox!")  # Set username and password
+# Setup MQTT client with credentials and better connection handling
+mqtt_client = mqtt.Client(client_id="symergy_server", clean_session=True)
+mqtt_client.username_pw_set("symergyuser", "SymergyRox!")
 mqtt_client.on_connect = on_connect
+mqtt_client.on_disconnect = on_disconnect  # Add disconnect handler
 mqtt_client.on_message = on_message
 
 def start_mqtt():
-    mqtt_client.connect("sssn.us", 1883, 60)  # Update to new broker hostname
-    mqtt_client.loop_forever()
+    while True:
+        try:
+            print("Connecting to MQTT broker...")
+            mqtt_client.connect("sssn.us", 1883, 60)
+            mqtt_client.loop_forever()
+        except Exception as e:
+            print(f"MQTT connection error: {e}")
+            time.sleep(5)  # Wait before reconnecting
 
 mqtt_thread = Thread(target=start_mqtt)
 mqtt_thread.daemon = True
