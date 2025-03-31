@@ -66,6 +66,8 @@ const GridVisualization = ({ section }) => {
   useEffect(() => {
     let isMounted = true;
     let fetchController = null;
+    let consecutiveErrorCount = 0;
+    const MAX_CONSECUTIVE_ERRORS = 3;
     
     const fetchData = async () => {
       if (!isMounted) return;
@@ -87,7 +89,9 @@ const GridVisualization = ({ section }) => {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
-          }
+          },
+          // Set a timeout for the fetch request
+          timeout: 2000
         });
         
         if (!response.ok) {
@@ -98,11 +102,27 @@ const GridVisualization = ({ section }) => {
         
         if (isMounted) {
           setGridData(data);
+          // Reset error count on successful fetch
+          consecutiveErrorCount = 0;
+          // Update last successful data time
+          window._lastGridDataUpdate = new Date().getTime();
         }
       } catch (error) {
         // Only log errors that aren't from aborting
         if (error.name !== 'AbortError') {
           console.error('Error fetching grid data:', error);
+          consecutiveErrorCount++;
+          
+          // If we've had multiple consecutive errors, try a more aggressive approach
+          if (consecutiveErrorCount >= MAX_CONSECUTIVE_ERRORS) {
+            console.warn(`${consecutiveErrorCount} consecutive fetch errors - refreshing connection`);
+            // Force a health check to the backend
+            try {
+              await fetch(`${API_URL}/health?t=${timestamp}`);
+            } catch (e) {
+              console.error('Health check failed:', e);
+            }
+          }
         }
       }
     };
@@ -110,30 +130,25 @@ const GridVisualization = ({ section }) => {
     // Initial fetch
     fetchData();
     
-    // Use a more reliable polling mechanism with health check
-    const intervalId = setInterval(() => {
-      fetchData();
-    }, 500);
+    // Use a more reliable polling mechanism
+    const intervalId = setInterval(fetchData, 1000); // Increased to 1 second for stability
     
-    // Add a health check interval that will force refresh if needed
-    const healthCheckId = setInterval(() => {
+    // Add a watchdog timer that will force refresh if needed
+    const watchdogId = setInterval(() => {
       const now = new Date().getTime();
       const lastUpdateTime = window._lastGridDataUpdate || 0;
       
-      // If we haven't had an update in 5 seconds, force a page refresh
-      if (now - lastUpdateTime > 5000 && lastUpdateTime !== 0) {
-        console.log("Data updates appear stuck, refreshing...");
+      // If we haven't had an update in 10 seconds, force a page refresh
+      if (lastUpdateTime > 0 && now - lastUpdateTime > 10000) {
+        console.warn(`No data updates for ${(now - lastUpdateTime)/1000} seconds - refreshing page`);
         window.location.reload();
       }
-      
-      // Record this health check
-      window._lastGridDataUpdate = now;
-    }, 5000);
+    }, 10000); // Check every 10 seconds
 
     return () => {
       isMounted = false;
       clearInterval(intervalId);
-      clearInterval(healthCheckId);
+      clearInterval(watchdogId);
       if (fetchController) {
         fetchController.abort();
       }

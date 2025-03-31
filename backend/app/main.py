@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import paho.mqtt.client as mqtt
 import json
@@ -6,6 +6,7 @@ from threading import Thread
 from collections import defaultdict, deque
 from datetime import datetime
 import time
+import threading
 
 app = Flask(__name__)
 CORS(app)
@@ -25,6 +26,52 @@ measurements = defaultdict(lambda: {
     "timestamps": deque(maxlen=MAX_HISTORY)
 })
 
+# Add this class directly in main.py instead of importing it
+class HealthMonitor(threading.Thread):
+    def __init__(self, mqtt_client):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.mqtt_client = mqtt_client
+        self.last_message_time = time.time()
+        self.running = True
+        
+    def message_received(self):
+        """Call this whenever a message is received"""
+        self.last_message_time = time.time()
+        
+    def run(self):
+        """Monitor health and restart connections if needed"""
+        while self.running:
+            try:
+                current_time = time.time()
+                # If no messages for 30 seconds, reconnect MQTT
+                if current_time - self.last_message_time > 30:
+                    print("No MQTT messages received for 30 seconds, reconnecting...")
+                    try:
+                        self.mqtt_client.disconnect()
+                        time.sleep(1)
+                        self.mqtt_client.reconnect()
+                        print("MQTT reconnection attempted")
+                    except Exception as e:
+                        print(f"Error during MQTT reconnection: {e}")
+                
+                # Check if Flask is responding
+                try:
+                    response = requests.get("http://localhost:5000/health", timeout=2)
+                    if response.status_code != 200:
+                        print(f"Health check failed with status {response.status_code}")
+                except Exception as e:
+                    print(f"Health check request failed: {e}")
+                    
+            except Exception as e:
+                print(f"Error in health monitor: {e}")
+                
+            # Sleep for 10 seconds before next check
+            time.sleep(10)
+            
+    def stop(self):
+        self.running = False
+
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
     # More specific subscription instead of "#" which is too broad
@@ -38,6 +85,10 @@ def on_disconnect(client, userdata, rc):
 
 def on_message(client, userdata, msg):
     try:
+        # Update the health monitor
+        if health_monitor:
+            health_monitor.message_received()
+            
         topic = msg.topic
         payload = json.loads(msg.payload.decode())
         current_time = datetime.utcnow().isoformat()
@@ -139,6 +190,12 @@ mqtt_client.on_disconnect = on_disconnect  # Add disconnect handler
 mqtt_client.on_message = on_message
 
 def start_mqtt():
+    global health_monitor
+    
+    # Create health monitor
+    health_monitor = HealthMonitor(mqtt_client)
+    health_monitor.start()
+    
     while True:
         try:
             print("Connecting to MQTT broker...")
@@ -154,7 +211,19 @@ mqtt_thread.start()
 
 @app.route('/health')
 def health_check():
-    return jsonify({"status": "ok", "components_loaded": components_loaded})
+    # Check if we've received any MQTT messages
+    mqtt_connected = mqtt_client.is_connected()
+    last_message_time = health_monitor.last_message_time if health_monitor else 0
+    current_time = time.time()
+    message_age = current_time - last_message_time
+    
+    return jsonify({
+        "status": "ok" if mqtt_connected and message_age < 30 else "degraded",
+        "mqtt_connected": mqtt_connected,
+        "components_count": len(components),
+        "last_message_age": message_age,
+        "server_time": current_time
+    })
 
 @app.route('/api/grid/data')
 def get_grid_data():
