@@ -1,5 +1,13 @@
 import React, { useState, useEffect, memo } from 'react';
 import { PlusIcon } from '@heroicons/react/24/outline';
+import poleIcon from '../svg/pole_icon.svg';
+import airportIcon from '../svg/airport.svg';
+import bigHouseIcon from '../svg/big_house_icon.svg';
+import houseIcon from '../svg/house_icon.svg';
+import generatorIcon from '../svg/generator.svg';
+import hydroIcon from '../svg/hydro.svg';
+import solarIcon from '../svg/solar.svg';
+import windIcon from '../svg/wind_icon.svg';
 
 // Add voltage thresholds
 const VOLTAGE_THRESHOLDS = {
@@ -24,34 +32,174 @@ const getVoltageStatusColor = (voltage, isOnline) => {
   return 'text-black';
 };
 
-const ComponentCard = ({ name, status, power, voltage, demand, isPole }) => {
+const ComponentCard = ({ name, status, power, voltage, demand, isPole, componentId, category }) => {
   const voltageColor = getVoltageStatusColor(voltage, status);
+  const isAirport = componentId && componentId.includes('airport');
+  const isMunicipalOrCommercial = category === 'municipal' || category === 'commercial';
+  const isResidential = category === 'residential';
+  const isGenerator = componentId && componentId.includes('generator');
+  const isHydro = componentId && componentId.includes('hydro_plant');
+  const isSolar = componentId && componentId.includes('solar');
+  const isWind = componentId && componentId.includes('turbine');
   
+  // Create a specific layout for poles
+  if (isPole) {
+    return (
+      <div className={`p-4 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4 relative`}>
+        {/* Left side content */}
+        <div className="flex">
+          <div className="flex-grow">
+            {/* Component name */}
+            <h3 className="font-semibold">{name}</h3>
+            
+            {/* Status indicator */}
+            <div className="flex items-center mt-2 mb-3">
+              <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'} mr-2`} />
+              <span className={`text-sm px-2 py-0.5 rounded-full ${status ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                {status ? 'Online' : 'Offline'}
+              </span>
+            </div>
+            
+            {/* Voltage reading */}
+            <div className={`text-sm ${voltageColor}`}>
+              Voltage: {voltage?.toFixed(2)} V
+            </div>
+          </div>
+          
+          {/* Right side SVG */}
+          <div className="absolute top-4 right-0" style={{ width: '70px', height: '70px' }}>
+            <img
+              src={poleIcon}
+              alt="Pole Icon"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Regular layout for non-pole components
   return (
-    <div className={`p-3 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4`}>
+    <div className={`p-3 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4 relative`}>
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">{name}</h3>
-        {isPole ? (
-          <div className="flex items-center">
-            <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'} mr-2`} />
-            <span className={`text-sm px-2 py-0.5 rounded-full ${status ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-              {status ? 'Online' : 'Offline'}
-            </span>
-          </div>
-        ) : (
-          <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
-        )}
+        <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
       </div>
+      
+      {/* Airport SVG for airport components */}
+      {isAirport && (
+        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
+          <img
+            src={airportIcon}
+            alt="Airport Icon"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Generator SVG for generator components */}
+      {isGenerator && (
+        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
+          <img
+            src={generatorIcon}
+            alt="Generator Icon"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Hydro SVG for hydro plant components */}
+      {isHydro && (
+        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
+          <img
+            src={hydroIcon}
+            alt="Hydro Plant Icon"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Solar SVG for solar components */}
+      {isSolar && (
+        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
+          <img
+            src={solarIcon}
+            alt="Solar Panel Icon"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Wind SVG for wind turbine components */}
+      {isWind && (
+        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
+          <img
+            src={windIcon}
+            alt="Wind Turbine Icon"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Big House SVG for municipal or commercial loads */}
+      {!isAirport && !isGenerator && !isHydro && !isSolar && !isWind && isMunicipalOrCommercial && (
+        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
+          <img
+            src={bigHouseIcon}
+            alt="Building Icon"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* House SVG for residential loads */}
+      {isResidential && (
+        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
+          <img
+            src={houseIcon}
+            alt="House Icon"
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
+            }}
+          />
+        </div>
+      )}
+      
       <div className="text-sm mt-1">
-        {isPole ? (
-          <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
-        ) : (
-          <>
-            <div>Power: {power?.toFixed(2)} kW</div>
-            <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
-            <div>Current: {demand?.toFixed(2)} A</div>
-          </>
-        )}
+        <div>Power: {power?.toFixed(2)} kW</div>
+        <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
+        <div>Current: {demand?.toFixed(2)} A</div>
       </div>
     </div>
   );
@@ -162,14 +310,24 @@ const GridVisualization = ({ section }) => {
 
   // Filter and group components by their type and category from the structure
   const groupedComponents = Object.entries(gridData.components).reduce((acc, [id, component]) => {
+    // Skip the meter structure itself
+    if (id === "meterstructure") return acc;
+
     // For loads, we want to use the actual component type and category
     if (component.type === 'load') {
       if (!acc.load) acc.load = {};
-      if (!acc.load[component.category]) acc.load[component.category] = [];
-      acc.load[component.category].push([id, component]);
+      
+      // Special handling for municipal vs commercial categorization
+      let category = component.category;
+      if (['church', 'airport', 'town_hall', 'post_office', 'water_pump'].includes(id)) {
+        category = 'municipal';
+      }
+      
+      if (!acc.load[category]) acc.load[category] = [];
+      acc.load[category].push([id, component]);
     }
     // For poles - check if the ID contains 'pole'
-    else if (id.includes('pole')) {  // Changed condition to check ID
+    else if (id.includes('pole')) {
       if (!acc.none) acc.none = {};
       if (!acc.none.pole) acc.none.pole = [];
       acc.none.pole.push([id, component]);
@@ -183,6 +341,22 @@ const GridVisualization = ({ section }) => {
     return acc;
   }, {});
 
+  // Debug logging for loads
+  useEffect(() => {
+    if (section === 'loads') {
+      console.log('Load Components by Category:', groupedComponents.load);
+    }
+  }, [gridData, groupedComponents, section]);
+
+  // Sort categories in specific order for loads
+  const loadCategoryOrder = {
+    'municipal': 1,
+    'commercial': 2,
+    'residential': 3,
+    'industrial': 4,
+    'other': 999
+  };
+
   // Sort components within each category
   Object.values(groupedComponents).forEach(typeGroup => {
     Object.values(typeGroup).forEach(components => {
@@ -195,13 +369,6 @@ const GridVisualization = ({ section }) => {
     });
   });
 
-  // Sort categories in specific order for loads
-  const loadCategoryOrder = {
-    'municipal': 1,
-    'commercial': 2,
-    'residential': 3,
-    'industrial': 4
-  };
 
   // Add memo to prevent unnecessary re-renders of ComponentCard
   const MemoizedComponentCard = React.memo(ComponentCard, (prevProps, nextProps) => {
@@ -235,6 +402,8 @@ const GridVisualization = ({ section }) => {
         voltage={measurements.voltage?.[lastIndex] ?? 0}
         demand={measurements.current?.[lastIndex] ?? 0}
         isPole={isPole}
+        componentId={id}
+        category={component.category}
       />
     );
   };
@@ -244,7 +413,7 @@ const GridVisualization = ({ section }) => {
       case 'poles':
         const poles = groupedComponents.none?.pole || [];
         return (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {poles.length > 0 ? (
               poles.map(([id, component]) => createComponentCard(id, component))
             ) : (
@@ -255,17 +424,13 @@ const GridVisualization = ({ section }) => {
 
       case 'loads':
         const loadCategories = groupedComponents.load || {};
-        const sortedLoadCategories = Object.entries(loadCategories)
-          .sort(([catA], [catB]) => 
-            (loadCategoryOrder[catA] || 999) - (loadCategoryOrder[catB] || 999)
-          );
-
         return (
           <div>
-            {sortedLoadCategories.map(([category, components]) => (
+            {Object.entries(loadCategories).map(([category, components]) => (
               <div key={category} className="mb-6 last:mb-0">
                 <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
-                <div className="grid grid-cols-3 gap-4">
+                {/* Always show 2 columns for loads */}
+                <div className="grid grid-cols-2 gap-4">
                   {components.map(([id, component]) => createComponentCard(id, component))}
                 </div>
               </div>
@@ -280,7 +445,7 @@ const GridVisualization = ({ section }) => {
             {Object.entries(sourceCategories).map(([category, components]) => (
               <div key={category} className="mb-6 last:mb-0">
                 <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {components.map(([id, component]) => createComponentCard(id, component))}
                 </div>
               </div>

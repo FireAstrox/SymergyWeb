@@ -76,6 +76,7 @@ def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
     # More specific subscription instead of "#" which is too broad
     client.subscribe("symergygrid/components/+/+/+")
+    client.subscribe("symergygrid/meterstructure")  # Add subscription for meter structure
     print("Subscribed to component topics")
 
 def on_disconnect(client, userdata, rc):
@@ -92,6 +93,25 @@ def on_message(client, userdata, msg):
         topic = msg.topic
         payload = json.loads(msg.payload.decode())
         current_time = datetime.utcnow().isoformat()
+
+        # Handle meter structure data
+        if topic == "symergygrid/meterstructure":
+            print(f"Received meter structure update: {payload}")
+            # Store the meter structure data
+            if "meterstructure" not in components:
+                components["meterstructure"] = {
+                    "type": "structure",
+                    "category": "meter",
+                    "name": "Meter Structure",
+                    "coordinates": {"lat": 0, "lon": 0, "alt": 0},
+                    "connections": [],
+                    "structure": payload  # Store the actual structure data
+                }
+            else:
+                components["meterstructure"]["structure"] = payload  # Update existing structure
+            measurements["meterstructure"]["status"].append(True)
+            measurements["meterstructure"]["timestamps"].append(current_time)
+            return
 
         # Handle component measurements
         parts = topic.split('/')
