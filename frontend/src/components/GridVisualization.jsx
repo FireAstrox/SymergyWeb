@@ -1,5 +1,6 @@
-import React, { useState, useEffect, memo } from 'react';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect, memo, useCallback } from 'react';
+import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import poleIcon from '../svg/pole_icon.svg';
 import airportIcon from '../svg/airport.svg';
 import bigHouseIcon from '../svg/big_house_icon.svg';
@@ -32,7 +33,313 @@ const getVoltageStatusColor = (voltage, isOnline) => {
   return 'text-black';
 };
 
-const ComponentCard = ({ name, status, power, voltage, demand, isPole, componentId, category }) => {
+// Update the ComponentDetailModal to conditionally render charts based on component type
+const ComponentDetailModal = ({ component, measurements, onClose }) => {
+  // Format data for charts - create 5-minute history
+  const formatTimeSeriesData = useCallback(() => {
+    if (!measurements) return [];
+    
+    const timestamps = measurements.timestamps || [];
+    const voltages = measurements.voltage || [];
+    const currents = measurements.current || [];
+    const powers = measurements.power || [];
+    const energies = measurements.energy || [];
+    
+    // Get the last index
+    const lastIndex = timestamps.length - 1;
+    
+    // Calculate how many data points to show (5 minutes worth)
+    const dataPoints = Math.min(300, timestamps.length); // 5 minutes = 300 seconds
+    
+    // Calculate the starting index
+    const startIndex = Math.max(0, lastIndex - dataPoints + 1);
+    
+    const data = [];
+    
+    for (let i = startIndex; i <= lastIndex; i++) {
+      if (timestamps[i]) {
+        // Parse the timestamp - handle both ISO strings and numeric timestamps
+        let timestamp;
+        try {
+          // Try to parse as ISO string first
+          timestamp = new Date(timestamps[i]);
+          // Check if valid date
+          if (isNaN(timestamp.getTime())) {
+            // If not valid, try as numeric timestamp
+            timestamp = new Date(Number(timestamps[i]));
+          }
+        } catch (e) {
+          // Fallback to current time if parsing fails
+          console.warn("Failed to parse timestamp:", timestamps[i]);
+          timestamp = new Date();
+        }
+        
+        // Format time for display - ensure it's in local time
+        const timeStr = timestamp.toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          second: '2-digit',
+          hour12: false // Use 24-hour format for consistency
+        });
+        
+        data.push({
+          time: timeStr,
+          timestamp: timestamp.getTime(), // Store raw timestamp for sorting
+          voltage: voltages[i] || 0,
+          current: currents[i] || 0,
+          power: powers[i] || 0,
+          energy: energies[i] || 0,
+        });
+      }
+    }
+    
+    // Sort by timestamp to ensure chronological order
+    data.sort((a, b) => a.timestamp - b.timestamp);
+    
+    return data;
+  }, [measurements]);
+  
+  const timeSeriesData = formatTimeSeriesData();
+  
+  // Get the latest values
+  const lastIndex = measurements?.status?.length - 1 || 0;
+  const status = measurements?.status?.[lastIndex] ?? false;
+  const voltage = measurements?.voltage?.[lastIndex] ?? 0;
+  const current = measurements?.current?.[lastIndex] ?? 0;
+  const power = measurements?.power?.[lastIndex] ?? 0;
+  const energy = measurements?.energy?.[lastIndex] ?? 0;
+  
+  // Check if this is a pole component
+  const isPole = component.category === 'pole' || (component.id && component.id.includes('pole'));
+  
+  // Add a helper function to calculate appropriate Y-axis domain
+  const calculateYDomain = useCallback((dataKey, buffer = 0.2) => {
+    if (!timeSeriesData || timeSeriesData.length === 0) {
+      return [0, 10]; // Default fallback
+    }
+    
+    // Filter out zero values which might skew the scale
+    const nonZeroValues = timeSeriesData
+      .map(item => item[dataKey])
+      .filter(val => val > 0);
+    
+    if (nonZeroValues.length === 0) {
+      return [0, 10]; // Default if no non-zero values
+    }
+    
+    const minValue = Math.min(...nonZeroValues);
+    const maxValue = Math.max(...nonZeroValues);
+    
+    // Calculate buffer amount
+    const range = maxValue - minValue;
+    const bufferAmount = range * buffer;
+    
+    // Set min to 0 or slightly below the minimum value
+    const yMin = 0; // Always start at 0 for these metrics
+    
+    // Set max to the maximum value plus a buffer
+    const yMax = maxValue + bufferAmount;
+    
+    // Ensure we have a minimum range to prevent flat lines
+    return [yMin, Math.max(yMax, minValue + 1)];
+  }, [timeSeriesData]);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-navy-900 text-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
+        {/* Header with close button */}
+        <div className="flex justify-between items-center p-4 border-b border-yellow-500">
+          <h2 className="text-xl font-bold">{component.name}</h2>
+          <button 
+            onClick={onClose}
+            className="text-white hover:text-yellow-500"
+          >
+            <XMarkIcon className="w-6 h-6" />
+          </button>
+        </div>
+        
+        {/* Component details */}
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-navy-800 p-3 rounded-lg">
+              <div className="text-sm text-gray-300">Status</div>
+              <div className="flex items-center mt-1">
+                <div className={`h-3 w-3 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'} mr-2`} />
+                <span className="text-lg font-semibold">{status ? 'Online' : 'Offline'}</span>
+              </div>
+            </div>
+            <div className="bg-navy-800 p-3 rounded-lg">
+              <div className="text-sm text-gray-300">Voltage</div>
+              <div className="text-lg font-semibold">{voltage.toFixed(2)} V</div>
+            </div>
+            
+            {/* Only show current for non-poles */}
+            {!isPole && (
+              <div className="bg-navy-800 p-3 rounded-lg">
+                <div className="text-sm text-gray-300">Current</div>
+                <div className="text-lg font-semibold">{current.toFixed(2)} A</div>
+              </div>
+            )}
+            
+            {/* Only show power for non-poles */}
+            {!isPole && (
+              <div className="bg-navy-800 p-3 rounded-lg">
+                <div className="text-sm text-gray-300">Power</div>
+                <div className="text-lg font-semibold">{power.toFixed(2)} kW</div>
+              </div>
+            )}
+            
+            {/* Only show energy for non-poles */}
+            {!isPole && (
+              <div className="bg-navy-800 p-3 rounded-lg">
+                <div className="text-sm text-gray-300">Energy</div>
+                <div className="text-lg font-semibold">{energy.toFixed(2)} kWh</div>
+              </div>
+            )}
+            
+            <div className="bg-navy-800 p-3 rounded-lg">
+              <div className="text-sm text-gray-300">Type</div>
+              <div className="text-lg font-semibold capitalize">{component.type} ({component.category})</div>
+            </div>
+          </div>
+          
+          {/* Always show Voltage History */}
+          <div className="border border-yellow-500 rounded-lg p-4 mb-6 bg-white">
+            <h3 className="text-lg font-semibold mb-4 text-navy-900">Voltage History</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={timeSeriesData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                <XAxis 
+                  dataKey="time" 
+                  stroke="#333" 
+                  tick={{ fontSize: 12 }}
+                  tickCount={6}
+                  minTickGap={30}
+                  interval="preserveStartEnd"
+                />
+                <YAxis 
+                  stroke="#333" 
+                  domain={calculateYDomain('voltage')}
+                  tickCount={7}
+                  tick={{ fontSize: 12 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="voltage" 
+                  stroke="#FFD700" 
+                  strokeWidth={2}
+                  dot={false} 
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Only show Current and Power History for non-poles */}
+          {!isPole && (
+            <>
+              <div className="border border-yellow-500 rounded-lg p-4 mb-6 bg-white">
+                <h3 className="text-lg font-semibold mb-4 text-navy-900">Current History</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                    <XAxis 
+                      dataKey="time" 
+                      stroke="#333" 
+                      tick={{ fontSize: 12 }}
+                      tickCount={6}
+                      minTickGap={30}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis 
+                      stroke="#333" 
+                      domain={calculateYDomain('current')}
+                      tickCount={7}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="current" 
+                      stroke="#FF4500" 
+                      strokeWidth={2}
+                      dot={false} 
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              
+              <div className="border border-yellow-500 rounded-lg p-4 mb-6 bg-white">
+                <h3 className="text-lg font-semibold mb-4 text-navy-900">Power History</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                    <XAxis 
+                      dataKey="time" 
+                      stroke="#333" 
+                      tick={{ fontSize: 12 }}
+                      tickCount={6}
+                      minTickGap={30}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis 
+                      stroke="#333" 
+                      domain={calculateYDomain('power')}
+                      tickCount={7}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="power" 
+                      stroke="#4CAF50" 
+                      strokeWidth={2}
+                      dot={false} 
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              
+              <div className="border border-yellow-500 rounded-lg p-4 bg-white">
+                <h3 className="text-lg font-semibold mb-4 text-navy-900">Energy History</h3>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                    <XAxis 
+                      dataKey="time" 
+                      stroke="#333" 
+                      tick={{ fontSize: 12 }}
+                      tickCount={6}
+                      minTickGap={30}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis 
+                      stroke="#333" 
+                      domain={calculateYDomain('energy')}
+                      tickCount={7}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="energy" 
+                      stroke="#1E90FF" 
+                      strokeWidth={2}
+                      dot={false} 
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Update the ComponentCard to be clickable
+const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, componentId, category, onClick }) => {
   const voltageColor = getVoltageStatusColor(voltage, status);
   const isAirport = componentId && componentId.includes('airport');
   const isMunicipalOrCommercial = category === 'municipal' || category === 'commercial';
@@ -45,7 +352,10 @@ const ComponentCard = ({ name, status, power, voltage, demand, isPole, component
   // Create a specific layout for poles
   if (isPole) {
     return (
-      <div className={`p-4 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4 relative`}>
+      <div 
+        className={`p-4 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4 relative cursor-pointer hover:shadow-lg transition-shadow`}
+        onClick={onClick}
+      >
         {/* Left side content */}
         <div className="flex">
           <div className="flex-grow">
@@ -85,7 +395,10 @@ const ComponentCard = ({ name, status, power, voltage, demand, isPole, component
   
   // Regular layout for non-pole components
   return (
-    <div className={`p-3 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4 relative`}>
+    <div 
+      className={`p-3 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4 relative cursor-pointer hover:shadow-lg transition-shadow`}
+      onClick={onClick}
+    >
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">{name}</h3>
         <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -200,6 +513,7 @@ const ComponentCard = ({ name, status, power, voltage, demand, isPole, component
         <div>Power: {power?.toFixed(2)} kW</div>
         <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
         <div>Current: {demand?.toFixed(2)} A</div>
+        <div>Energy: {energy?.toFixed(2)} kWh</div>
       </div>
     </div>
   );
@@ -210,6 +524,9 @@ const GridVisualization = ({ section }) => {
     components: {},
     measurements: {}
   });
+  
+  // Add state for the selected component
+  const [selectedComponent, setSelectedComponent] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -376,11 +693,12 @@ const GridVisualization = ({ section }) => {
       prevProps.status === nextProps.status &&
       prevProps.voltage === nextProps.voltage &&
       prevProps.power === nextProps.power &&
-      prevProps.demand === nextProps.demand
+      prevProps.demand === nextProps.demand &&
+      prevProps.energy === nextProps.energy
     );
   });
 
-  // Update createComponentCard to use memoized version
+  // Update createComponentCard to use memoized version and handle click
   const createComponentCard = (id, component) => {
     const measurements = gridData.measurements[id] || {
       status: [true],
@@ -401,9 +719,11 @@ const GridVisualization = ({ section }) => {
         power={measurements.power?.[lastIndex] ?? 0}
         voltage={measurements.voltage?.[lastIndex] ?? 0}
         demand={measurements.current?.[lastIndex] ?? 0}
+        energy={measurements.energy?.[lastIndex] ?? 0}
         isPole={isPole}
         componentId={id}
         category={component.category}
+        onClick={() => setSelectedComponent({ id, component })}
       />
     );
   };
@@ -461,6 +781,15 @@ const GridVisualization = ({ section }) => {
   return (
     <div className="w-full h-full">
       {renderSection()}
+      
+      {/* Render the detail modal when a component is selected */}
+      {selectedComponent && (
+        <ComponentDetailModal
+          component={selectedComponent.component}
+          measurements={gridData.measurements[selectedComponent.id]}
+          onClose={() => setSelectedComponent(null)}
+        />
+      )}
     </div>
   );
 };
