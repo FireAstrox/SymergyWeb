@@ -723,7 +723,10 @@ const GridVisualization = ({ section }) => {
         isPole={isPole}
         componentId={id}
         category={component.category}
-        onClick={() => setSelectedComponent({ id, component })}
+        onClick={() => {
+          // Navigate to the component details page with the component ID
+          window.location.href = `/component/${id}`;
+        }}
       />
     );
   };
@@ -733,7 +736,7 @@ const GridVisualization = ({ section }) => {
       case 'poles':
         const poles = groupedComponents.none?.pole || [];
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {poles.length > 0 ? (
               poles.map(([id, component]) => createComponentCard(id, component))
             ) : (
@@ -749,8 +752,7 @@ const GridVisualization = ({ section }) => {
             {Object.entries(loadCategories).map(([category, components]) => (
               <div key={category} className="mb-6 last:mb-0">
                 <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
-                {/* Always show 2 columns for loads */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {components.map(([id, component]) => createComponentCard(id, component))}
                 </div>
               </div>
@@ -765,7 +767,7 @@ const GridVisualization = ({ section }) => {
             {Object.entries(sourceCategories).map(([category, components]) => (
               <div key={category} className="mb-6 last:mb-0">
                 <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                   {components.map(([id, component]) => createComponentCard(id, component))}
                 </div>
               </div>
@@ -781,15 +783,6 @@ const GridVisualization = ({ section }) => {
   return (
     <div className="w-full h-full">
       {renderSection()}
-      
-      {/* Render the detail modal when a component is selected */}
-      {selectedComponent && (
-        <ComponentDetailModal
-          component={selectedComponent.component}
-          measurements={gridData.measurements[selectedComponent.id]}
-          onClose={() => setSelectedComponent(null)}
-        />
-      )}
     </div>
   );
 };

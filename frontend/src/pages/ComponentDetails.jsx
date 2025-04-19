@@ -1,0 +1,373 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+
+const ComponentDetails = () => {
+  const { componentId } = useParams();
+  const navigate = useNavigate();
+  const [component, setComponent] = useState(null);
+  const [measurements, setMeasurements] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch component data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const timestamp = new Date().getTime();
+        const response = await fetch(`${API_URL}/api/grid/data?t=${timestamp}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Find the component by ID
+        const decodedId = decodeURIComponent(componentId);
+        const componentData = data.components[decodedId];
+        const measurementData = data.measurements[decodedId];
+        
+        if (!componentData) {
+          throw new Error(`Component not found: ${decodedId}`);
+        }
+        
+        setComponent(componentData);
+        setMeasurements(measurementData);
+      } catch (error) {
+        console.error('Error fetching component data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+    
+    // Set up polling for live updates
+    const intervalId = setInterval(fetchData, 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [componentId]);
+  
+  // Format time series data for charts
+  const formatTimeSeriesData = useCallback(() => {
+    if (!measurements) return [];
+    
+    const timestamps = measurements.timestamps || [];
+    const voltages = measurements.voltage || [];
+    const currents = measurements.current || [];
+    const powers = measurements.power || [];
+    const energies = measurements.energy || [];
+    
+    // Get the last index
+    const lastIndex = timestamps.length - 1;
+    
+    // Calculate how many data points to show (5 minutes worth)
+    const dataPoints = Math.min(300, timestamps.length); // 5 minutes = 300 seconds
+    
+    // Calculate the starting index
+    const startIndex = Math.max(0, lastIndex - dataPoints + 1);
+    
+    const data = [];
+    
+    for (let i = startIndex; i <= lastIndex; i++) {
+      if (timestamps[i]) {
+        // Parse the timestamp - handle both ISO strings and numeric timestamps
+        let timestamp;
+        try {
+          // Try to parse as ISO string first
+          timestamp = new Date(timestamps[i]);
+          // Check if valid date
+          if (isNaN(timestamp.getTime())) {
+            // If not valid, try as numeric timestamp
+            timestamp = new Date(Number(timestamps[i]));
+          }
+        } catch (e) {
+          // Fallback to current time if parsing fails
+          console.warn("Failed to parse timestamp:", timestamps[i]);
+          timestamp = new Date();
+        }
+        
+        // Format time for display - ensure it's in local time
+        const timeStr = timestamp.toLocaleTimeString([], { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          second: '2-digit',
+          hour12: false // Use 24-hour format for consistency
+        });
+        
+        data.push({
+          time: timeStr,
+          timestamp: timestamp.getTime(), // Store raw timestamp for sorting
+          voltage: voltages[i] || 0,
+          current: currents[i] || 0,
+          power: powers[i] || 0,
+          energy: energies[i] || 0,
+        });
+      }
+    }
+    
+    // Sort by timestamp to ensure chronological order
+    data.sort((a, b) => a.timestamp - b.timestamp);
+    
+    return data;
+  }, [measurements]);
+  
+  const timeSeriesData = formatTimeSeriesData();
+  
+  // Calculate Y-axis domain based on data
+  const calculateYDomain = useCallback((dataKey, buffer = 0.2) => {
+    if (!timeSeriesData || timeSeriesData.length === 0) {
+      return [0, 10]; // Default fallback
+    }
+    
+    // Filter out zero values which might skew the scale
+    const nonZeroValues = timeSeriesData
+      .map(item => item[dataKey])
+      .filter(val => val > 0);
+    
+    if (nonZeroValues.length === 0) {
+      return [0, 10]; // Default if no non-zero values
+    }
+    
+    const minValue = Math.min(...nonZeroValues);
+    const maxValue = Math.max(...nonZeroValues);
+    
+    // Calculate buffer amount
+    const range = maxValue - minValue;
+    const bufferAmount = range * buffer;
+    
+    // Set min to 0 or slightly below the minimum value
+    const yMin = 0; // Always start at 0 for these metrics
+    
+    // Set max to the maximum value plus a buffer
+    const yMax = maxValue + bufferAmount;
+    
+    // Ensure we have a minimum range to prevent flat lines
+    return [yMin, Math.max(yMax, minValue + 1)];
+  }, [timeSeriesData]);
+  
+  // Get the latest values
+  const lastIndex = measurements?.status?.length - 1 || 0;
+  const status = measurements?.status?.[lastIndex] ?? false;
+  const voltage = measurements?.voltage?.[lastIndex] ?? 0;
+  const current = measurements?.current?.[lastIndex] ?? 0;
+  const power = measurements?.power?.[lastIndex] ?? 0;
+  const energy = measurements?.energy?.[lastIndex] ?? 0;
+  
+  // Check if this is a pole component
+  const isPole = component?.category === 'pole' || (componentId && componentId.includes('pole'));
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-xl text-navy-900">Loading component data...</div>
+      </div>
+    );
+  }
+  
+  if (!component) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-xl text-red-600">Component not found</div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="container mx-auto p-4">
+      {/* Header with back button */}
+      <div className="flex justify-between items-center p-4 mb-6 border-b border-yellow-500">
+        <h1 className="text-2xl font-bold text-navy-900">{component.name}</h1>
+        <button 
+          onClick={() => navigate(-1)}
+          className="text-navy-900 hover:text-yellow-500"
+        >
+          <XMarkIcon className="w-6 h-6" />
+        </button>
+      </div>
+      
+      {/* Component details */}
+      <div className="bg-navy-900 text-white rounded-lg p-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-navy-800 p-3 rounded-lg">
+            <div className="text-sm text-gray-300">Status</div>
+            <div className="flex items-center mt-1">
+              <div className={`h-3 w-3 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'} mr-2`} />
+              <span className="text-lg font-semibold">{status ? 'Online' : 'Offline'}</span>
+            </div>
+          </div>
+          <div className="bg-navy-800 p-3 rounded-lg">
+            <div className="text-sm text-gray-300">Voltage</div>
+            <div className="text-lg font-semibold">{voltage.toFixed(2)} V</div>
+          </div>
+          
+          {/* Only show current for non-poles */}
+          {!isPole && (
+            <div className="bg-navy-800 p-3 rounded-lg">
+              <div className="text-sm text-gray-300">Current</div>
+              <div className="text-lg font-semibold">{current.toFixed(2)} A</div>
+            </div>
+          )}
+          
+          {/* Only show power for non-poles */}
+          {!isPole && (
+            <div className="bg-navy-800 p-3 rounded-lg">
+              <div className="text-sm text-gray-300">Power</div>
+              <div className="text-lg font-semibold">{power.toFixed(2)} kW</div>
+            </div>
+          )}
+          
+          {/* Only show energy for non-poles */}
+          {!isPole && (
+            <div className="bg-navy-800 p-3 rounded-lg">
+              <div className="text-sm text-gray-300">Energy</div>
+              <div className="text-lg font-semibold">{energy.toFixed(2)} kWh</div>
+            </div>
+          )}
+          
+          <div className="bg-navy-800 p-3 rounded-lg">
+            <div className="text-sm text-gray-300">Type</div>
+            <div className="text-lg font-semibold capitalize">{component.type} ({component.category})</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Charts */}
+      <div className="space-y-6">
+        {/* Always show Voltage History */}
+        <div className="border border-yellow-500 rounded-lg p-4 bg-white">
+          <h3 className="text-lg font-semibold mb-4 text-navy-900">Voltage History</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={timeSeriesData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+              <XAxis 
+                dataKey="time" 
+                stroke="#333" 
+                tick={{ fontSize: 12 }}
+                tickCount={6}
+                minTickGap={30}
+                interval="preserveStartEnd"
+              />
+              <YAxis 
+                stroke="#333" 
+                domain={calculateYDomain('voltage')}
+                tickCount={7}
+                tick={{ fontSize: 12 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="voltage" 
+                stroke="#FFD700" 
+                strokeWidth={2}
+                dot={false} 
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        
+        {/* Only show Current and Power History for non-poles */}
+        {!isPole && (
+          <>
+            <div className="border border-yellow-500 rounded-lg p-4 bg-white">
+              <h3 className="text-lg font-semibold mb-4 text-navy-900">Current History</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                  <XAxis 
+                    dataKey="time" 
+                    stroke="#333" 
+                    tick={{ fontSize: 12 }}
+                    tickCount={6}
+                    minTickGap={30}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    stroke="#333" 
+                    domain={calculateYDomain('current')}
+                    tickCount={7}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="current" 
+                    stroke="#FF4500" 
+                    strokeWidth={2}
+                    dot={false} 
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="border border-yellow-500 rounded-lg p-4 bg-white">
+              <h3 className="text-lg font-semibold mb-4 text-navy-900">Power History</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                  <XAxis 
+                    dataKey="time" 
+                    stroke="#333" 
+                    tick={{ fontSize: 12 }}
+                    tickCount={6}
+                    minTickGap={30}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    stroke="#333" 
+                    domain={calculateYDomain('power')}
+                    tickCount={7}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="power" 
+                    stroke="#4CAF50" 
+                    strokeWidth={2}
+                    dot={false} 
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="border border-yellow-500 rounded-lg p-4 bg-white">
+              <h3 className="text-lg font-semibold mb-4 text-navy-900">Energy History</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={timeSeriesData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                  <XAxis 
+                    dataKey="time" 
+                    stroke="#333" 
+                    tick={{ fontSize: 12 }}
+                    tickCount={6}
+                    minTickGap={30}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    stroke="#333" 
+                    domain={calculateYDomain('energy')}
+                    tickCount={7}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="energy" 
+                    stroke="#1E90FF" 
+                    strokeWidth={2}
+                    dot={false} 
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ComponentDetails; 
