@@ -519,6 +519,9 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
   );
 };
 
+// Create memoized version of ComponentCard
+const MemoizedComponentCard = React.memo(ComponentCard);
+
 const GridVisualization = ({ section }) => {
   const [gridData, setGridData] = useState({
     components: {},
@@ -531,32 +534,34 @@ const GridVisualization = ({ section }) => {
   useEffect(() => {
     let isMounted = true;
     let fetchController = null;
-    let consecutiveErrorCount = 0;
-    const MAX_CONSECUTIVE_ERRORS = 3;
-    
+    let lastFetchTime = 0;
+    const FETCH_INTERVAL = 1000; // 1 second
+
     const fetchData = async () => {
-      if (!isMounted) return;
-      
-      // Cancel any pending requests
-      if (fetchController) {
-        fetchController.abort();
-      }
-      
-      // Create a new AbortController for this request
-      fetchController = new AbortController();
-      
       try {
+        const now = Date.now();
+        // Ensure we're not fetching too frequently
+        if (now - lastFetchTime < FETCH_INTERVAL) {
+          return;
+        }
+        lastFetchTime = now;
+
+        // Cancel any pending requests
+        if (fetchController) {
+          fetchController.abort();
+        }
+        
+        // Create a new AbortController for this request
+        fetchController = new AbortController();
+
         const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-        const timestamp = new Date().getTime(); // Add cache-busting timestamp
-        const response = await fetch(`${API_URL}/api/grid/data?t=${timestamp}`, {
+        const response = await fetch(`${API_URL}/api/grid/data?t=${now}`, {
           signal: fetchController.signal,
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
-          },
-          // Set a timeout for the fetch request
-          timeout: 2000
+          }
         });
         
         if (!response.ok) {
@@ -566,28 +571,19 @@ const GridVisualization = ({ section }) => {
         const data = await response.json();
         
         if (isMounted) {
-          setGridData(data);
-          // Reset error count on successful fetch
-          consecutiveErrorCount = 0;
-          // Update last successful data time
-          window._lastGridDataUpdate = new Date().getTime();
+          setGridData(prevData => {
+            // Only update if data has actually changed
+            const prevDataStr = JSON.stringify(prevData);
+            const newDataStr = JSON.stringify(data);
+            if (prevDataStr !== newDataStr) {
+              return data;
+            }
+            return prevData;
+          });
         }
       } catch (error) {
-        // Only log errors that aren't from aborting
         if (error.name !== 'AbortError') {
           console.error('Error fetching grid data:', error);
-          consecutiveErrorCount++;
-          
-          // If we've had multiple consecutive errors, try a more aggressive approach
-          if (consecutiveErrorCount >= MAX_CONSECUTIVE_ERRORS) {
-            console.warn(`${consecutiveErrorCount} consecutive fetch errors - refreshing connection`);
-            // Force a health check to the backend
-            try {
-              await fetch(`${API_URL}/health?t=${timestamp}`);
-            } catch (e) {
-              console.error('Health check failed:', e);
-            }
-          }
         }
       }
     };
@@ -595,111 +591,73 @@ const GridVisualization = ({ section }) => {
     // Initial fetch
     fetchData();
     
-    // Use a more reliable polling mechanism
-    const intervalId = setInterval(fetchData, 1000); // Increased to 1 second for stability
+    // Set up polling interval with requestAnimationFrame for smoother updates
+    let frameId;
+    let lastFrameTime = 0;
     
-    // Add a watchdog timer that will force refresh if needed
-    const watchdogId = setInterval(() => {
-      const now = new Date().getTime();
-      const lastUpdateTime = window._lastGridDataUpdate || 0;
+    const tick = (timestamp) => {
+      if (!lastFrameTime) lastFrameTime = timestamp;
       
-      // If we haven't had an update in 10 seconds, force a page refresh
-      if (lastUpdateTime > 0 && now - lastUpdateTime > 10000) {
-        console.warn(`No data updates for ${(now - lastUpdateTime)/1000} seconds - refreshing page`);
-        window.location.reload();
+      const elapsed = timestamp - lastFrameTime;
+      
+      if (elapsed >= FETCH_INTERVAL) {
+        fetchData();
+        lastFrameTime = timestamp;
       }
-    }, 10000); // Check every 10 seconds
+      
+      frameId = requestAnimationFrame(tick);
+    };
+    
+    frameId = requestAnimationFrame(tick);
 
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
-      clearInterval(watchdogId);
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
       if (fetchController) {
         fetchController.abort();
       }
     };
   }, []);
 
-  // Record when we get data
-  useEffect(() => {
-    window._lastGridDataUpdate = new Date().getTime();
-  }, [gridData]);
-
   // Filter and group components by their type and category from the structure
-  const groupedComponents = Object.entries(gridData.components).reduce((acc, [id, component]) => {
-    // Skip the meter structure itself
-    if (id === "meterstructure") return acc;
+  const groupedComponents = React.useMemo(() => {
+    return Object.entries(gridData.components).reduce((acc, [id, component]) => {
+      // Skip the meter structure itself
+      if (id === "meterstructure") return acc;
 
-    // For loads, we want to use the actual component type and category
-    if (component.type === 'load') {
-      if (!acc.load) acc.load = {};
-      
-      // Special handling for municipal vs commercial categorization
-      let category = component.category;
-      if (['church', 'airport', 'town_hall', 'post_office', 'water_pump'].includes(id)) {
-        category = 'municipal';
+      // For loads, we want to use the actual component type and category
+      if (component.type === 'load') {
+        if (!acc.load) acc.load = {};
+        
+        // Special handling for municipal vs commercial categorization
+        let category = component.category;
+        if (['church', 'airport', 'town_hall', 'post_office', 'water_pump'].includes(id)) {
+          category = 'municipal';
+        }
+        
+        if (!acc.load[category]) acc.load[category] = [];
+        acc.load[category].push([id, component]);
       }
-      
-      if (!acc.load[category]) acc.load[category] = [];
-      acc.load[category].push([id, component]);
-    }
-    // For poles - check if the ID contains 'pole'
-    else if (id.includes('pole')) {
-      if (!acc.none) acc.none = {};
-      if (!acc.none.pole) acc.none.pole = [];
-      acc.none.pole.push([id, component]);
-    }
-    // For sources
-    else if (component.type === 'source') {
-      if (!acc.source) acc.source = {};
-      if (!acc.source[component.category]) acc.source[component.category] = [];
-      acc.source[component.category].push([id, component]);
-    }
-    return acc;
-  }, {});
+      // For poles - check if the ID contains 'pole'
+      else if (id.includes('pole')) {
+        if (!acc.none) acc.none = {};
+        if (!acc.none.pole) acc.none.pole = [];
+        acc.none.pole.push([id, component]);
+      }
+      // For sources
+      else if (component.type === 'source') {
+        if (!acc.source) acc.source = {};
+        if (!acc.source[component.category]) acc.source[component.category] = [];
+        acc.source[component.category].push([id, component]);
+      }
+      return acc;
+    }, {});
+  }, [gridData.components]);
 
-  // Debug logging for loads
-  useEffect(() => {
-    if (section === 'loads') {
-      console.log('Load Components by Category:', groupedComponents.load);
-    }
-  }, [gridData, groupedComponents, section]);
-
-  // Sort categories in specific order for loads
-  const loadCategoryOrder = {
-    'municipal': 1,
-    'commercial': 2,
-    'residential': 3,
-    'industrial': 4,
-    'other': 999
-  };
-
-  // Sort components within each category
-  Object.values(groupedComponents).forEach(typeGroup => {
-    Object.values(typeGroup).forEach(components => {
-      components.sort(([idA, compA], [idB, compB]) => {
-        // Extract numbers for numerical sorting
-        const numA = parseInt(compA.name.match(/\d+/)?.[0] || '0');
-        const numB = parseInt(compB.name.match(/\d+/)?.[0] || '0');
-        return numA - numB;
-      });
-    });
-  });
-
-
-  // Add memo to prevent unnecessary re-renders of ComponentCard
-  const MemoizedComponentCard = React.memo(ComponentCard, (prevProps, nextProps) => {
-    return (
-      prevProps.status === nextProps.status &&
-      prevProps.voltage === nextProps.voltage &&
-      prevProps.power === nextProps.power &&
-      prevProps.demand === nextProps.demand &&
-      prevProps.energy === nextProps.energy
-    );
-  });
-
-  // Update createComponentCard to use memoized version and handle click
-  const createComponentCard = (id, component) => {
+  // Create component card with useCallback
+  const createComponentCard = React.useCallback((id, component) => {
     const measurements = gridData.measurements[id] || {
       status: [true],
       timestamps: [],
@@ -724,14 +682,14 @@ const GridVisualization = ({ section }) => {
         componentId={id}
         category={component.category}
         onClick={() => {
-          // Navigate to the component details page with the component ID
-          window.location.href = `/component/${id}`;
+          window.location.href = `/components/${encodeURIComponent(id)}`;
         }}
       />
     );
-  };
+  }, [gridData.measurements]);
 
-  const renderSection = () => {
+  // Render section with useMemo
+  const renderedSection = React.useMemo(() => {
     switch (section) {
       case 'poles':
         const poles = groupedComponents.none?.pole || [];
@@ -778,11 +736,11 @@ const GridVisualization = ({ section }) => {
       default:
         return null;
     }
-  };
+  }, [section, groupedComponents, createComponentCard]);
 
   return (
     <div className="w-full h-full">
-      {renderSection()}
+      {renderedSection}
     </div>
   );
 };

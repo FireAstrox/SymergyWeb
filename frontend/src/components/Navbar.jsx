@@ -11,9 +11,12 @@ const Navbar = () => {
           <span className="text-2xl font-bold">Symergy</span>
         </Link>
         
-        <div className="flex items-center self-center">
+        <div className="flex items-center self-center space-x-6">
           <Link to="/dashboard" className="hover:text-yellow-500 transition-colors text-xl pt-1">
             Dashboard
+          </Link>
+          <Link to="/components" className="hover:text-yellow-500 transition-colors text-xl pt-1">
+            Components
           </Link>
         </div>
       </div>

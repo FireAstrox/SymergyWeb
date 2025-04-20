@@ -1,22 +1,38 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 const ComponentDetails = () => {
   const { componentId } = useParams();
-  const navigate = useNavigate();
   const [component, setComponent] = useState(null);
   const [measurements, setMeasurements] = useState(null);
   const [loading, setLoading] = useState(true);
   
   // Fetch component data
   useEffect(() => {
+    let isMounted = true;
+    let fetchController = null;
+
     const fetchData = async () => {
       try {
+        // Cancel any pending requests
+        if (fetchController) {
+          fetchController.abort();
+        }
+        
+        // Create a new AbortController for this request
+        fetchController = new AbortController();
+
         const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
         const timestamp = new Date().getTime();
-        const response = await fetch(`${API_URL}/api/grid/data?t=${timestamp}`);
+        const response = await fetch(`${API_URL}/api/grid/data?t=${timestamp}`, {
+          signal: fetchController.signal,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -33,21 +49,31 @@ const ComponentDetails = () => {
           throw new Error(`Component not found: ${decodedId}`);
         }
         
-        setComponent(componentData);
-        setMeasurements(measurementData);
+        if (isMounted) {
+          setComponent(componentData);
+          setMeasurements(measurementData);
+          setLoading(false);
+        }
       } catch (error) {
-        console.error('Error fetching component data:', error);
-      } finally {
-        setLoading(false);
+        if (error.name !== 'AbortError') {
+          console.error('Error fetching component data:', error);
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
       }
     };
     
     fetchData();
-    
-    // Set up polling for live updates
     const intervalId = setInterval(fetchData, 1000);
     
-    return () => clearInterval(intervalId);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      if (fetchController) {
+        fetchController.abort();
+      }
+    };
   }, [componentId]);
   
   // Format time series data for charts
@@ -161,7 +187,7 @@ const ComponentDetails = () => {
   
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <div className="text-xl text-navy-900">Loading component data...</div>
       </div>
     );
@@ -169,23 +195,17 @@ const ComponentDetails = () => {
   
   if (!component) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <div className="text-xl text-red-600">Component not found</div>
       </div>
     );
   }
   
   return (
-    <div className="container mx-auto p-4">
-      {/* Header with back button */}
-      <div className="flex justify-between items-center p-4 mb-6 border-b border-yellow-500">
+    <div className="p-6 h-full overflow-y-auto">
+      {/* Header */}
+      <div className="mb-6 border-b border-yellow-500 pb-4">
         <h1 className="text-2xl font-bold text-navy-900">{component.name}</h1>
-        <button 
-          onClick={() => navigate(-1)}
-          className="text-navy-900 hover:text-yellow-500"
-        >
-          <XMarkIcon className="w-6 h-6" />
-        </button>
       </div>
       
       {/* Component details */}
