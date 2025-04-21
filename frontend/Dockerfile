@@ -20,6 +20,7 @@ RUN touch .env
 ENV REACT_APP_API_URL=http://localhost:5000
 ENV NODE_ENV=development
 ENV WATCHPACK_POLLING=true
+ENV CI=true
 
 # Expose port 3000
 EXPOSE 3000
