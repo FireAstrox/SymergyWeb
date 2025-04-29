@@ -77,6 +77,7 @@ def on_connect(client, userdata, flags, rc):
     # More specific subscription instead of "#" which is too broad
     client.subscribe("symergygrid/components/+/+/+")
     client.subscribe("symergygrid/meterstructure")  # Add subscription for meter structure
+    client.subscribe("symergygrid/geojson")  # Add subscription for GeoJSON data
     print("Subscribed to component topics")
 
 def on_disconnect(client, userdata, rc):
@@ -93,6 +94,24 @@ def on_message(client, userdata, msg):
         topic = msg.topic
         payload = json.loads(msg.payload.decode())
         current_time = datetime.utcnow().isoformat()
+
+        # Handle GeoJSON data
+        if topic == "symergygrid/geojson":
+            print(f"Received GeoJSON update")
+            # Store the GeoJSON data
+            if "geojson" not in components:
+                components["geojson"] = {
+                    "type": "geojson",
+                    "category": "map",
+                    "name": "Grid GeoJSON",
+                    "data": payload
+                }
+            else:
+                components["geojson"]["data"] = payload
+            
+            measurements["geojson"]["status"].append(True)
+            measurements["geojson"]["timestamps"].append(current_time)
+            return
 
         # Handle meter structure data
         if topic == "symergygrid/meterstructure":

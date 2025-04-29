@@ -1,8 +1,15 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import logoSvg from '../svg/logo.svg';
 
 const Navbar = () => {
+  const location = useLocation();
+  
+  // Helper function to determine if a link is active
+  const isActive = (path) => {
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <nav className="bg-navy-900 text-white shadow-md">
       <div className="container mx-auto px-4 py-3 flex items-center">
@@ -12,11 +19,29 @@ const Navbar = () => {
         </Link>
         
         <div className="flex items-center self-center space-x-6">
-          <Link to="/dashboard" className="hover:text-yellow-500 transition-colors text-xl pt-1">
+          <Link 
+            to="/dashboard" 
+            className={`transition-colors text-xl pt-1 ${
+              isActive('/dashboard') ? 'text-yellow-500' : 'hover:text-yellow-500'
+            }`}
+          >
             Dashboard
           </Link>
-          <Link to="/components" className="hover:text-yellow-500 transition-colors text-xl pt-1">
+          <Link 
+            to="/components" 
+            className={`transition-colors text-xl pt-1 ${
+              isActive('/components') ? 'text-yellow-500' : 'hover:text-yellow-500'
+            }`}
+          >
             Components
+          </Link>
+          <Link 
+            to="/map" 
+            className={`transition-colors text-xl pt-1 ${
+              isActive('/map') ? 'text-yellow-500' : 'hover:text-yellow-500'
+            }`}
+          >
+            Map
           </Link>
         </div>
       </div>

@@ -5,6 +5,7 @@ import ComponentDetails from './pages/ComponentDetails';
 import Components from './pages/Components';
 import Layout from './components/Layout';
 import logoSvg from './svg/logo.svg';
+import MapView from './pages/MapView';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="components" element={<Components />}>
             <Route path=":componentId" element={<ComponentDetails />} />
           </Route>
+          <Route path="map" element={<MapView />} />
         </Route>
       </Routes>
     </Router>

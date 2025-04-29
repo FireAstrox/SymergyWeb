@@ -624,8 +624,8 @@ const GridVisualization = ({ section }) => {
   // Filter and group components by their type and category from the structure
   const groupedComponents = React.useMemo(() => {
     return Object.entries(gridData.components).reduce((acc, [id, component]) => {
-      // Skip the meter structure itself
-      if (id === "meterstructure") return acc;
+      // Skip the meter structure itself and GeoJSON data
+      if (id === "meterstructure" || id === "geojson") return acc;
 
       // For loads, we want to use the actual component type and category
       if (component.type === 'load') {
@@ -658,6 +658,9 @@ const GridVisualization = ({ section }) => {
 
   // Create component card with useCallback
   const createComponentCard = React.useCallback((id, component) => {
+    // Skip GeoJSON data in component cards
+    if (id === 'geojson') return null;
+    
     const measurements = gridData.measurements[id] || {
       status: [true],
       timestamps: [],
