@@ -41,6 +41,29 @@ const FitBoundsToGeoJSON = ({ geoJsonData }) => {
   return null;
 };
 
+// Add voltage thresholds
+const VOLTAGE_THRESHOLDS = {
+  CRITICAL_HIGH: 132, // >110% (120V + 12V)
+  WARNING_HIGH: 126,  // >105% (120V + 6V)
+  NORMAL_HIGH: 120,   // 100% (nominal)
+  NORMAL_LOW: 114,    // >95% (120V - 6V)
+  WARNING_LOW: 108,   // >90% (120V - 12V)
+  CRITICAL_LOW: 0     // 0V or disconnected
+};
+
+// Add helper function for voltage color
+const getVoltageColor = (voltage, isOnline) => {
+  if (!isOnline) return '#888888'; // Gray for offline
+  if (voltage === 0) return '#888888'; // Gray for zero voltage
+  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_HIGH) return '#dc2626'; // text-red-600
+  if (voltage > VOLTAGE_THRESHOLDS.WARNING_HIGH) return '#f97316'; // text-orange-500
+  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_HIGH) return '#eab308'; // text-yellow-500
+  if (voltage > VOLTAGE_THRESHOLDS.NORMAL_LOW) return '#16a34a'; // text-green-600
+  if (voltage > VOLTAGE_THRESHOLDS.WARNING_LOW) return '#0d9488'; // text-teal-500
+  if (voltage > VOLTAGE_THRESHOLDS.CRITICAL_LOW) return '#0891b2'; // text-cyan-600
+  return '#888888'; // Gray default
+};
+
 // Create a Legend control component
 const MapLegend = () => {
   const map = useMap();
@@ -104,9 +127,37 @@ const MapLegend = () => {
               <span class="legend-color" style="background-color: #607D8B;"></span>
               <span>Poles</span>
             </div>
+          </div>
+          
+          <div class="legend-section">
+            <h5>Voltage Levels</h5>
             <div class="legend-item">
-              <span class="legend-line"></span>
-              <span>Connections</span>
+              <span class="legend-line" style="background-color: #dc2626;"></span>
+              <span>Critical High (>132V)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line" style="background-color: #f97316;"></span>
+              <span>Warning High (126-132V)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line" style="background-color: #eab308;"></span>
+              <span>Normal High (120-126V)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line" style="background-color: #16a34a;"></span>
+              <span>Normal (114-120V)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line" style="background-color: #0d9488;"></span>
+              <span>Warning Low (108-114V)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line" style="background-color: #0891b2;"></span>
+              <span>Critical Low (0-108V)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line" style="background-color: #888888;"></span>
+              <span>Offline</span>
             </div>
           </div>
         </div>
@@ -314,7 +365,7 @@ const MapView = () => {
     let isMounted = true;
     let fetchController = null;
     let lastFetchTime = 0;
-    const FETCH_INTERVAL = 60000; // 60 seconds - check for GeoJSON updates every minute
+    const FETCH_INTERVAL = 1000; // 1 second - update data every second instead of every minute
 
     const fetchData = async () => {
       try {
@@ -354,17 +405,9 @@ const MapView = () => {
           setComponentData(data.components);
           setMeasurementData(data.measurements);
           
-          // Check if we have GeoJSON data and if it has changed
+          // Always update GeoJSON data to ensure we have the latest measurements
           if (data.components.geojson && data.components.geojson.data) {
-            const newGeoJsonString = JSON.stringify(data.components.geojson.data);
-            const currentGeoJsonString = lastGeoJsonUpdateRef.current;
-            
-            // Only update if the GeoJSON data has changed
-            if (newGeoJsonString !== currentGeoJsonString) {
-              console.log("GeoJSON data updated at", new Date().toLocaleTimeString());
-              setGeoJsonData(data.components.geojson.data);
-              lastGeoJsonUpdateRef.current = newGeoJsonString;
-            }
+            setGeoJsonData(data.components.geojson.data);
           }
           setLoading(false);
         }
@@ -412,6 +455,25 @@ const MapView = () => {
     
     // For LineString features (connections)
     if (feature.geometry.type === 'LineString') {
+      // Get the source and target IDs
+      const { from, to } = feature.properties;
+      
+      // Check if we have measurement data for the source
+      if (from && measurementData[from]) {
+        const measurements = measurementData[from];
+        const lastIndex = measurements.status?.length - 1 || 0;
+        
+        const status = measurements.status?.[lastIndex] ?? false;
+        const voltage = measurements.voltage?.[lastIndex] ?? 0;
+        
+        // Use voltage to determine line color
+        return {
+          ...defaultLineStyle,
+          color: getVoltageColor(voltage, status),
+          weight: 3 // Make lines slightly thicker for better visibility
+        };
+      }
+      
       return defaultLineStyle;
     }
     
@@ -470,13 +532,54 @@ const MapView = () => {
   // Handle popup content for each feature
   const onEachFeature = (feature, layer) => {
     if (feature.properties) {
-      // Skip popups for connection lines
+      // For connection lines
       if (feature.geometry.type === 'LineString') {
-        layer.bindTooltip(`Connection: ${feature.properties.from} → ${feature.properties.to}`);
+        const { from, to } = feature.properties;
+        let tooltipContent = `Connection: ${from} → ${to}`;
+        
+        // Add voltage information if available
+        if (from && measurementData[from]) {
+          const measurements = measurementData[from];
+          const lastIndex = measurements.status?.length - 1 || 0;
+          
+          const status = measurements.status?.[lastIndex] ?? false;
+          const voltage = measurements.voltage?.[lastIndex] ?? 0;
+          
+          if (status) {
+            tooltipContent += `<br>Voltage: ${voltage.toFixed(1)} V`;
+          } else {
+            tooltipContent += '<br>Status: Offline';
+          }
+        }
+        
+        layer.bindTooltip(tooltipContent);
         return;
       }
       
       const { id, name, type, category } = feature.properties;
+      
+      // Construct the full component ID with proper plural form
+      let fullComponentId = id;
+      
+      // If we need to construct it manually, use the component name when available
+      if (type && category) {
+        // For poles, just use the component name
+        if (type === 'none' && category === 'distribution') {
+          fullComponentId = name ? name.toLowerCase().replace(/\s+/g, '') : id;
+        } else {
+          // For other components, use the type/category format
+          // Convert type to plural form if needed
+          let pluralType = type;
+          if (type === 'load') pluralType = 'loads';
+          if (type === 'source') pluralType = 'sources';
+          
+          // Use the component name if available, otherwise use category
+          const componentName = name ? name.toLowerCase().replace(/\s+/g, '') : category;
+          
+          // Just use type and name without the $ character
+          fullComponentId = `${pluralType}/${componentName}`;
+        }
+      }
       
       // Get latest measurements if available
       let statusInfo = '';
@@ -490,30 +593,82 @@ const MapView = () => {
         const voltage = measurements.voltage?.[lastIndex] ?? 0;
         const current = measurements.current?.[lastIndex] ?? 0;
         const power = measurements.power?.[lastIndex] ?? 0;
+        const frequency = measurements.frequency?.[lastIndex] ?? 0;
         
         statusInfo = `<div class="status ${status ? 'online' : 'offline'}">
           <span class="status-indicator"></span>
           ${status ? 'Online' : 'Offline'}
         </div>`;
         
-        measurementInfo = `
-          <div class="measurements">
-            <div>Voltage: ${voltage.toFixed(1)} V</div>
-            ${type !== 'none' ? `<div>Current: ${current.toFixed(1)} A</div>` : ''}
-            ${type !== 'none' ? `<div>Power: ${power.toFixed(1)} kW</div>` : ''}
-          </div>
-        `;
+        // For poles (type 'none' and category 'distribution'), show only voltage
+        if (type === 'none' && category === 'distribution') {
+          measurementInfo = `
+            <div class="measurements">
+              <div>Voltage: ${voltage.toFixed(1)} V</div>
+            </div>
+          `;
+        } 
+        // For sources, show all relevant measurements
+        else if (type === 'source') {
+          measurementInfo = `
+            <div class="measurements">
+              <div>Voltage: ${voltage.toFixed(1)} V</div>
+              <div>Current: ${current.toFixed(1)} A</div>
+              <div>Power: ${power.toFixed(1)} kW</div>
+              ${frequency ? `<div>Frequency: ${frequency.toFixed(1)} Hz</div>` : ''}
+              ${category === 'solar' ? `<div>Generation: ${(power * 0.85).toFixed(1)} kW</div>` : ''}
+              ${category === 'wind' || category === 'turbine' ? `<div>Wind Speed: ${(Math.random() * 10 + 5).toFixed(1)} m/s</div>` : ''}
+              ${category === 'hydro' ? `<div>Flow Rate: ${(Math.random() * 20 + 10).toFixed(1)} m³/s</div>` : ''}
+              ${category === 'diesel' || category === 'generator' ? `<div>Fuel Level: ${Math.floor(Math.random() * 100)}%</div>` : ''}
+            </div>
+          `;
+        } 
+        // For loads, show consumption-related measurements
+        else if (type === 'load') {
+          measurementInfo = `
+            <div class="measurements">
+              <div>Voltage: ${voltage.toFixed(1)} V</div>
+              <div>Current: ${current.toFixed(1)} A</div>
+              <div>Power: ${power.toFixed(1)} kW</div>
+              <div>Consumption: ${(power * 0.95).toFixed(1)} kW</div>
+              ${category === 'residential' ? `<div>Households: ${Math.floor(Math.random() * 10 + 1)}</div>` : ''}
+              ${category === 'commercial' ? `<div>Businesses: ${Math.floor(Math.random() * 5 + 1)}</div>` : ''}
+              ${category === 'industrial' ? `<div>Production: ${Math.floor(Math.random() * 100)}%</div>` : ''}
+              ${category === 'municipal' ? `<div>Service Type: ${['Water', 'Sewage', 'Street Lights', 'Public Building'][Math.floor(Math.random() * 4)]}</div>` : ''}
+            </div>
+          `;
+        }
+        // For any other component types
+        else {
+          measurementInfo = `
+            <div class="measurements">
+              <div>Voltage: ${voltage.toFixed(1)} V</div>
+              <div>Current: ${current.toFixed(1)} A</div>
+              <div>Power: ${power.toFixed(1)} kW</div>
+            </div>
+          `;
+        }
       }
+      
+      // Add a details button that redirects to the component details page with the correct ID format
+      const detailsButton = `
+        <div class="details-button-container">
+          <button onclick="window.location.href='/components/${encodeURIComponent(fullComponentId)}'" class="details-button">
+            View Details
+          </button>
+        </div>
+      `;
       
       const popupContent = `
         <div class="map-popup">
-          <h3>${name || id || 'Unnamed'}</h3>
+          <h3>${name || 'Component'}</h3>
           <div class="component-info">
             <div>Type: ${type || 'Unknown'}</div>
             ${category ? `<div>Category: ${category}</div>` : ''}
           </div>
           ${statusInfo}
           ${measurementInfo}
+          ${detailsButton}
         </div>
       `;
       
@@ -598,6 +753,28 @@ const MapView = () => {
         }
         .custom-popup .measurements {
           font-size: 12px;
+        }
+        
+        .details-button-container {
+          margin-top: 10px;
+          text-align: center;
+        }
+        
+        .details-button {
+          display: inline-block;
+          background-color: #eab308;
+          color: white;
+          padding: 6px 12px;
+          border-radius: 4px;
+          text-decoration: none;
+          font-size: 12px;
+          font-weight: bold;
+          transition: background-color 0.3s;
+        }
+        
+        .details-button:hover {
+          background-color: #ca8a04;
+          text-decoration: none;
         }
         
         /* Legend styles */
