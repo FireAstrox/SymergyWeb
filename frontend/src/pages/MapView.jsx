@@ -490,7 +490,7 @@ const MapView = () => {
           case 'turbine':
             return { ...defaultPointStyle, fillColor: '#87CEEB' }; // Sky Blue
           case 'hydro':
-            return { ...defaultPointStyle, fillColor: '#1E90FF' }; // Dodger Blue
+            return { ...defaultPointStyle, fillColor: 'rgb(16, 0, 244)' }; // Dodger Blue
           case 'diesel':
           case 'generator':
             return { ...defaultPointStyle, fillColor: '#8B4513' }; // Saddle Brown

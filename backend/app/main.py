@@ -128,6 +128,43 @@ def on_message(client, userdata, msg):
                 }
             else:
                 components["meterstructure"]["structure"] = payload  # Update existing structure
+            
+            # Update component information from the meter structure
+            if "components" in payload:
+                for component_data in payload["components"]:
+                    component_id = component_data.get("id")
+                    if not component_id:
+                        continue
+                        
+                    # Format the component ID based on its type
+                    if component_data.get("type") == "source":
+                        formatted_id = f"sources/{component_id}"
+                    elif component_data.get("type") == "load":
+                        formatted_id = f"loads/{component_id}"
+                    elif "pole" in component_id:
+                        formatted_id = component_id  # Poles keep their original ID
+                    else:
+                        formatted_id = component_id
+                        
+                    # Create or update the component with data from the meter structure
+                    if formatted_id not in components:
+                        components[formatted_id] = {
+                            "type": component_data.get("type", "unknown"),
+                            "category": component_data.get("category", "unknown"),
+                            "name": component_data.get("name", component_id),
+                            "coordinates": component_data.get("coordinates", {"lat": 0, "lon": 0, "alt": 0}),
+                            "connections": component_data.get("connections", [])
+                        }
+                    else:
+                        # Update existing component with new data
+                        components[formatted_id].update({
+                            "type": component_data.get("type", components[formatted_id].get("type", "unknown")),
+                            "category": component_data.get("category", components[formatted_id].get("category", "unknown")),
+                            "name": component_data.get("name", components[formatted_id].get("name", component_id)),
+                            "coordinates": component_data.get("coordinates", components[formatted_id].get("coordinates", {"lat": 0, "lon": 0, "alt": 0})),
+                            "connections": component_data.get("connections", components[formatted_id].get("connections", []))
+                        })
+            
             measurements["meterstructure"]["status"].append(True)
             measurements["meterstructure"]["timestamps"].append(current_time)
             return
@@ -193,21 +230,11 @@ def on_message(client, userdata, msg):
                 
                 # Create load component if it doesn't exist
                 if component_id not in components:
-                    # Determine category from the component name
-                    if "residential" in parts[3]:
-                        category = "residential"
-                        display_name = f"Residential {parts[3].replace('residential', '')}"
-                    # Add municipal category for specific components
-                    elif parts[3] in ["airport", "water_pump", "town_hall", "post_office"]:
-                        category = "municipal"
-                        display_name = parts[3].replace('_', ' ').title()
-                    # Add industrial category for specific components
-                    elif parts[3] in ["lumber_mill", "factory", "warehouse", "plant"]:
-                        category = "industrial"
-                        display_name = parts[3].replace('_', ' ').title()
-                    else:
-                        category = "commercial"
-                        display_name = parts[3].replace('_', ' ').title()
+                    # Use the component name for display, but keep original category from MQTT if available
+                    display_name = parts[3].replace('_', ' ').title()
+                    
+                    # Check if category is provided in the payload
+                    category = payload.get("category", "load")
                     
                     components[component_id] = {
                         "type": "load",
