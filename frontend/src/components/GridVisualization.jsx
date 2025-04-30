@@ -362,13 +362,6 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
             {/* Component name */}
             <h3 className="font-semibold">{name}</h3>
             
-            {/* Category badge */}
-            <div className="mt-1 mb-2">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500">
-                {category || 'pole'}
-              </span>
-            </div>
-            
             {/* Status indicator */}
             <div className="flex items-center mt-2 mb-3">
               <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'} mr-2`} />
@@ -409,13 +402,6 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">{name}</h3>
         <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
-      </div>
-      
-      {/* Category badge */}
-      <div className="mt-1 mb-2">
-        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500">
-          {category || 'unknown'}
-        </span>
       </div>
       
       {/* Select appropriate icon based on component ID */}
@@ -639,8 +625,9 @@ const GridVisualization = ({ section }) => {
 
       // For loads, we want to use the actual component type and category
       if (component.type === 'load') {
-        if (!acc.load) acc.load = [];
-        acc.load.push([id, component]);
+        if (!acc.load) acc.load = {};
+        if (!acc.load[component.category]) acc.load[component.category] = [];
+        acc.load[component.category].push([id, component]);
       }
       // For poles - check if the ID contains 'pole'
       else if (id.includes('pole')) {
@@ -726,14 +713,17 @@ const GridVisualization = ({ section }) => {
         );
 
       case 'loads':
-        const loads = groupedComponents.load || [];
+        const loadCategories = groupedComponents.load || {};
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {loads.length > 0 ? (
-              loads.map(([id, component]) => createComponentCard(id, component))
-            ) : (
-              <div className="text-navy-900">No loads found</div>
-            )}
+          <div>
+            {Object.entries(loadCategories).map(([category, components]) => (
+              <div key={category} className="mb-6 last:mb-0">
+                <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {components.map(([id, component]) => createComponentCard(id, component))}
+                </div>
+              </div>
+            ))}
           </div>
         );
 
