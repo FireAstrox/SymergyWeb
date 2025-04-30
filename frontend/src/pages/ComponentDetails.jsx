@@ -2,9 +2,64 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 
-// Create a global history store that persists across component renders
-// This will be shared across all instances of ComponentDetails
-const globalComponentHistories = {};
+// Create a global history store that persists across component renders and page reloads
+let globalComponentHistories = {};
+
+// Try to load saved history from localStorage on initial load
+try {
+  const savedHistory = localStorage.getItem('componentHistories');
+  if (savedHistory) {
+    globalComponentHistories = JSON.parse(savedHistory);
+    
+    // Clean up any stale data (older than 5 minutes)
+    const cutoffTime = Date.now() - (5 * 60 * 1000);
+    Object.keys(globalComponentHistories).forEach(componentId => {
+      const componentHistory = globalComponentHistories[componentId];
+      Object.keys(componentHistory).forEach(timeKey => {
+        if (componentHistory[timeKey].timestamp < cutoffTime) {
+          delete componentHistory[timeKey];
+        }
+      });
+      
+      // Remove component if it has no history points left
+      if (Object.keys(componentHistory).length === 0) {
+        delete globalComponentHistories[componentId];
+      }
+    });
+  }
+} catch (error) {
+  console.error('Error loading history from localStorage:', error);
+  globalComponentHistories = {};
+}
+
+// Function to save history to localStorage (throttled to avoid performance issues)
+const saveHistoryToStorage = (() => {
+  let timeoutId = null;
+  
+  return () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    
+    timeoutId = setTimeout(() => {
+      try {
+        localStorage.setItem('componentHistories', JSON.stringify(globalComponentHistories));
+      } catch (error) {
+        console.error('Error saving history to localStorage:', error);
+        // If localStorage is full, clear it and try again
+        if (error.name === 'QuotaExceededError') {
+          localStorage.clear();
+          try {
+            localStorage.setItem('componentHistories', JSON.stringify(globalComponentHistories));
+          } catch (e) {
+            console.error('Still unable to save history after clearing localStorage:', e);
+          }
+        }
+      }
+      timeoutId = null;
+    }, 2000); // Save every 2 seconds at most
+  };
+})();
 
 const CustomTooltip = ({ active, payload, label, dataKey }) => {
   if (active && payload && payload.length) {
@@ -183,6 +238,9 @@ const ComponentDetails = () => {
         }
       });
     }
+    
+    // After updating history, save to localStorage
+    saveHistoryToStorage();
   }, []);
   
   // Get time series data for the current component
