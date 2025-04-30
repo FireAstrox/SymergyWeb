@@ -9,6 +9,7 @@ import generatorIcon from '../svg/generator.svg';
 import hydroIcon from '../svg/hydro.svg';
 import solarIcon from '../svg/solar.svg';
 import windIcon from '../svg/wind_icon.svg';
+import industrialIcon from '../svg/industrial.svg';
 
 // Add voltage thresholds
 const VOLTAGE_THRESHOLDS = {
@@ -414,6 +415,24 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         
         {/* Icons with improved size and positioning */}
         <div className="ml-2" style={{ width: '100px', height: '100px' }}>
+          {/* Industrial icon for industrial category */}
+          {category === 'industrial' && (
+            <div className="relative" style={{ width: '140%', height: '140%', top: '-90px' }}>
+              <img
+                src={industrialIcon}
+                alt="Industrial Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-25%'
+                }}
+              />
+            </div>
+          )}
+          
           {/* Airport icon */}
           {isAirport && (
             <div className="relative" style={{ width: '120%', height: '120%', top: '-75px' }}>
@@ -505,7 +524,8 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
           )}
           
           {/* Building icon for commercial/municipal */}
-          {!isAirport && !isGenerator && !isHydro && !isSolar && !isWind && (category === 'commercial' || category === 'municipal') && (
+          {!isAirport && !isGenerator && !isHydro && !isSolar && !isWind && 
+           category !== 'industrial' && (category === 'commercial' || category === 'municipal') && (
             <div className="relative" style={{ width: '240%', height: '240%', top: '-135px' }}>
               <img
                 src={bigHouseIcon}
