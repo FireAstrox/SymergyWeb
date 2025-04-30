@@ -7,6 +7,8 @@ from collections import defaultdict, deque
 from datetime import datetime
 import time
 import threading
+import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 CORS(app)
@@ -256,9 +258,15 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Error processing message: {e}")
 
+# Load environment variables from .env file
+load_dotenv()
+
 # Setup MQTT client with credentials and better connection handling
 mqtt_client = mqtt.Client(client_id="symergy_server", clean_session=True)
-mqtt_client.username_pw_set("symergyuser", "SymergyRox!")
+mqtt_client.username_pw_set(
+    os.getenv("MQTT_USERNAME", "symergyuser"), 
+    os.getenv("MQTT_PASSWORD", "SymergyRox!")
+)
 mqtt_client.on_connect = on_connect
 mqtt_client.on_disconnect = on_disconnect  # Add disconnect handler
 mqtt_client.on_message = on_message
@@ -270,10 +278,14 @@ def start_mqtt():
     health_monitor = HealthMonitor(mqtt_client)
     health_monitor.start()
     
+    # Get MQTT connection details from environment variables with fallbacks
+    mqtt_broker = os.getenv("MQTT_BROKER", "sssn.us")
+    mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
+    
     while True:
         try:
-            print("Connecting to MQTT broker...")
-            mqtt_client.connect("sssn.us", 1883, 60)
+            print(f"Connecting to MQTT broker at {mqtt_broker}:{mqtt_port}...")
+            mqtt_client.connect(mqtt_broker, mqtt_port, 60)
             mqtt_client.loop_forever()
         except Exception as e:
             print(f"MQTT connection error: {e}")

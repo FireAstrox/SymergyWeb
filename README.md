@@ -2,7 +2,7 @@
 
 SymergyWeb is a comprehensive web application for visualizing and monitoring microgrid systems. It provides real-time data visualization of electrical components including power sources, loads, and distribution infrastructure.
 
-![SymergyWeb Dashboard](https://example.com/dashboard-screenshot.png)
+![SymergyWeb Dashboard]()
 
 ## Features
 
@@ -24,70 +24,19 @@ SymergyWeb consists of two main components:
 
 ## Prerequisites
 
-- Node.js (v14+)
 - Python (v3.8+)
 - Docker and Docker Compose (for containerized deployment)
 - MQTT broker (e.g., Mosquitto)
 
-## Installation and Setup
-
-### Local Development
-
-#### Backend Setup
-
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-
-2. Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Run the Flask server:
-   ```bash
-   python app/main.py
-   ```
-
-#### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Create a `.env` file with the following content:
-   ```
-   REACT_APP_API_URL=http://localhost:5000
-   ```
-
-4. Start the development server:
-   ```bash
-   npm start
-   ```
-
-5. The application will be available at `http://localhost:3000`
 
 ### Docker Deployment
 
 1. Build and start the containers:
    ```bash
-   docker-compose up -d --build
+   docker compose up -d
    ```
 
-2. The application will be available at `http://localhost:80`
+2. The application will be available at `http://localhost:3000`
 
 ## Production Deployment
 
@@ -254,7 +203,16 @@ The system supports several component categories:
    - Modify the styling in `MapView.jsx` to change how components appear on the map
    - Update the GeoJSON processing to add new features
 
+## Environment Variables
 
+The backend uses the following environment variables:
+
+- `MQTT_BROKER`: MQTT broker address
+- `MQTT_PORT`: MQTT broker port (default: 1883)
+- `MQTT_USERNAME`: MQTT username
+- `MQTT_PASSWORD`: MQTT password
+
+You can set these variables in a `.env` file in the backend directory or through your deployment environment.
 
 ## License
 
