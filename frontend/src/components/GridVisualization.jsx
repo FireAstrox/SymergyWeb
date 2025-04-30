@@ -404,112 +404,142 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
       </div>
       
-      {/* Select appropriate icon based on component ID */}
-      {isAirport && (
-        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
-          <img
-            src={airportIcon}
-            alt="Airport Icon"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-            }}
-          />
+      <div className="flex justify-between items-start mt-2">
+        <div className="text-sm">
+          <div>Power: {power?.toFixed(2)} kW</div>
+          <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
+          <div>Current: {demand?.toFixed(2)} A</div>
+          <div>Energy: {energy?.toFixed(2)} kWh</div>
         </div>
-      )}
-      
-      {isGenerator && (
-        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
-          <img
-            src={generatorIcon}
-            alt="Generator Icon"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-            }}
-          />
+        
+        {/* Icons with improved size and positioning */}
+        <div className="ml-2" style={{ width: '100px', height: '100px' }}>
+          {/* Airport icon */}
+          {isAirport && (
+            <div className="relative" style={{ width: '120%', height: '120%', top: '-75px' }}>
+              <img
+                src={airportIcon}
+                alt="Airport Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-25%'
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Generator icon */}
+          {isGenerator && (
+            <div className="relative" style={{ width: '140%', height: '140%', top: '-80px' }}>
+              <img
+                src={generatorIcon}
+                alt="Generator Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-15%'
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Hydro icon */}
+          {isHydro && (
+            <div className="relative" style={{ width: '100%', height: '100%', top: '-25px' }}>
+              <img
+                src={hydroIcon}
+                alt="Hydro Plant Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-5%'
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Solar icon */}
+          {isSolar && (
+            <div className="relative" style={{ width: '100%', height: '100%', top: '-45px' }}>
+              <img
+                src={solarIcon}
+                alt="Solar Panel Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '10%'
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Wind icon */}
+          {isWind && (
+            <div className="relative" style={{ width: '240%', height: '240%', top: '-155px' }}>
+              <img
+                src={windIcon}
+                alt="Wind Turbine Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-30%'
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Building icon for commercial/municipal */}
+          {!isAirport && !isGenerator && !isHydro && !isSolar && !isWind && (category === 'commercial' || category === 'municipal') && (
+            <div className="relative" style={{ width: '240%', height: '240%', top: '-135px' }}>
+              <img
+                src={bigHouseIcon}
+                alt="Building Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-10%'
+                }}
+              />
+            </div>
+          )}
+          
+          {/* House icon for residential */}
+          {category === 'residential' && (
+            <div className="relative" style={{ width: '240%', height: '240%', top: '-175px' }}>
+              <img
+                src={houseIcon}
+                alt="House Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-30%'
+                }}
+              />
+            </div>
+          )}
         </div>
-      )}
-      
-      {isHydro && (
-        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
-          <img
-            src={hydroIcon}
-            alt="Hydro Plant Icon"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-            }}
-          />
-        </div>
-      )}
-      
-      {isSolar && (
-        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
-          <img
-            src={solarIcon}
-            alt="Solar Panel Icon"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-            }}
-          />
-        </div>
-      )}
-      
-      {isWind && (
-        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
-          <img
-            src={windIcon}
-            alt="Wind Turbine Icon"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-            }}
-          />
-        </div>
-      )}
-      
-      {/* Default building icon for commercial/municipal loads that don't have a specific icon */}
-      {!isAirport && !isGenerator && !isHydro && !isSolar && !isWind && (category === 'commercial' || category === 'municipal') && (
-        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
-          <img
-            src={bigHouseIcon}
-            alt="Building Icon"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-            }}
-          />
-        </div>
-      )}
-      
-      {/* House SVG for residential loads */}
-      {category === 'residential' && (
-        <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
-          <img
-            src={houseIcon}
-            alt="House Icon"
-            style={{ 
-              width: '100%', 
-              height: '100%', 
-              filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-            }}
-          />
-        </div>
-      )}
-      
-      <div className="text-sm mt-1">
-        <div>Power: {power?.toFixed(2)} kW</div>
-        <div className={voltageColor}>Voltage: {voltage?.toFixed(2)} V</div>
-        <div>Current: {demand?.toFixed(2)} A</div>
-        <div>Energy: {energy?.toFixed(2)} kWh</div>
       </div>
     </div>
   );
