@@ -25,9 +25,11 @@ SymergyWeb consists of two main components:
 ## Prerequisites
 
 - Python (v3.8+)
-- Docker and Docker Compose (for containerized deployment)
+- Docker (v20.10+)
+- Docker Compose (v2.0+)
 - MQTT broker (e.g., Mosquitto)
 
+## Development
 
 ### Docker Deployment
 
@@ -40,7 +42,7 @@ SymergyWeb consists of two main components:
 
 ## Production Deployment
 
-### Option 1: Docker on a VPS
+### Docker on a Virtual Private Server
 
 1. Clone the repository on your VPS:
    ```bash
@@ -51,6 +53,7 @@ SymergyWeb consists of two main components:
 2. Create a `.env` file with production settings:
    ```
    MQTT_BROKER=your-mqtt-broker-address
+   MQTT_PORT=1883
    MQTT_USERNAME=your-mqtt-username
    MQTT_PASSWORD=your-mqtt-password
    ```
@@ -60,26 +63,7 @@ SymergyWeb consists of two main components:
    docker-compose -f docker-compose.prod.yml up -d --build
    ```
 
-4. Configure Nginx or another reverse proxy to handle HTTPS and serve the application.
-
-### Option 2: Cloud Deployment (AWS)
-
-1. **Frontend**: Deploy the React app to AWS Amplify or S3 + CloudFront
-   ```bash
-   # Build the frontend
-   cd frontend
-   npm run build
-   
-   # Deploy to S3 (requires AWS CLI configured)
-   aws s3 sync build/ s3://your-bucket-name --acl public-read
-   ```
-
-2. **Backend**: Deploy the Flask app to AWS Elastic Beanstalk or ECS
-   - Create an Elastic Beanstalk environment with the Python platform
-   - Deploy the backend code using the EB CLI or AWS console
-   - Configure environment variables for MQTT connection
-
-3. Configure the frontend's `.env` file to point to your backend API endpoint.
+4. The application will be available at `https://your-server-ip`
 
 ## MQTT Configuration
 
