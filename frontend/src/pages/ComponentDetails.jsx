@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 
+// Create a global history store that persists across component renders
+// This will be shared across all instances of ComponentDetails
+const globalComponentHistories = {};
+
 const CustomTooltip = ({ active, payload, label, dataKey }) => {
   if (active && payload && payload.length) {
     // Get the appropriate unit based on the data key
@@ -31,24 +35,19 @@ const ComponentDetails = () => {
   const [component, setComponent] = useState(null);
   const [measurements, setMeasurements] = useState(null);
   const [loading, setLoading] = useState(true);
-  const componentHistoriesRef = useRef({});
+  const [allComponents, setAllComponents] = useState({});
   
   // Format Y-axis tick values
   const formatYAxisTick = (value) => {
     return value < 10 ? value.toFixed(1) : Math.round(value);
   };
   
-  // Fetch component data
+  // Effect to fetch ALL components and their measurements
   useEffect(() => {
     let isMounted = true;
     let fetchController = null;
-
-    // Initialize history for this component if it doesn't exist yet
-    if (!componentHistoriesRef.current[componentId]) {
-      componentHistoriesRef.current[componentId] = {};
-    }
-
-    const fetchData = async () => {
+    
+    const fetchAllData = async () => {
       try {
         // Cancel any pending requests
         if (fetchController) {
@@ -75,38 +74,40 @@ const ComponentDetails = () => {
         
         const data = await response.json();
         
-        // Find the component by ID
-        const decodedId = decodeURIComponent(componentId);
-        const componentData = data.components[decodedId];
-        const measurementData = data.measurements[decodedId];
-        
-        if (!componentData) {
-          throw new Error(`Component not found: ${decodedId}`);
-        }
-        
         if (isMounted) {
-          setComponent(componentData);
-          setMeasurements(measurementData);
+          // Store all components
+          setAllComponents(data.components);
           
-          // Process and store the new measurement data in our rolling history
-          if (measurementData) {
-            updateTimeSeriesHistory(componentId, measurementData);
+          // Find the current component
+          if (componentId) {
+            const decodedId = decodeURIComponent(componentId);
+            const componentData = data.components[decodedId];
+            const measurementData = data.measurements[decodedId];
+            
+            if (componentData) {
+              setComponent(componentData);
+              setMeasurements(measurementData);
+              setLoading(false);
+            }
           }
           
-          setLoading(false);
+          // Process ALL components' measurements to build history
+          Object.entries(data.measurements).forEach(([id, measurementData]) => {
+            updateTimeSeriesHistory(id, measurementData);
+          });
         }
       } catch (error) {
         if (error.name !== 'AbortError') {
-          console.error('Error fetching component data:', error);
-          if (isMounted) {
+          console.error('Error fetching data:', error);
+          if (isMounted && componentId) {
             setLoading(false);
           }
         }
       }
     };
     
-    fetchData();
-    const intervalId = setInterval(fetchData, 1000);
+    fetchAllData();
+    const intervalId = setInterval(fetchAllData, 1000);
     
     return () => {
       isMounted = false;
@@ -119,6 +120,11 @@ const ComponentDetails = () => {
   
   // Function to update the rolling history with new data
   const updateTimeSeriesHistory = useCallback((id, newMeasurements) => {
+    // Initialize history for this component if it doesn't exist yet
+    if (!globalComponentHistories[id]) {
+      globalComponentHistories[id] = {};
+    }
+    
     const timestamps = newMeasurements.timestamps || [];
     const voltages = newMeasurements.voltage || [];
     const currents = newMeasurements.current || [];
@@ -158,7 +164,7 @@ const ComponentDetails = () => {
       const timeKey = timestamp.getTime().toString();
       
       // Add the new data point to our history for this component
-      componentHistoriesRef.current[id][timeKey] = {
+      globalComponentHistories[id][timeKey] = {
         time: timeStr,
         timestamp: timestamp.getTime(),
         voltage: voltages[lastIndex] || 0,
@@ -171,18 +177,20 @@ const ComponentDetails = () => {
       const cutoffTime = timestamp.getTime() - (5 * 60 * 1000);
       
       // Filter out old entries
-      Object.keys(componentHistoriesRef.current[id]).forEach(key => {
-        if (componentHistoriesRef.current[id][key].timestamp < cutoffTime) {
-          delete componentHistoriesRef.current[id][key];
+      Object.keys(globalComponentHistories[id]).forEach(key => {
+        if (globalComponentHistories[id][key].timestamp < cutoffTime) {
+          delete globalComponentHistories[id][key];
         }
       });
     }
   }, []);
   
-  // Convert the rolling history object to an array for the charts
+  // Get time series data for the current component
   const getTimeSeriesData = useCallback(() => {
+    if (!componentId) return [];
+    
     // Get the history for the current component
-    const componentHistory = componentHistoriesRef.current[componentId] || {};
+    const componentHistory = globalComponentHistories[componentId] || {};
     
     // Convert the history object to an array
     const dataArray = Object.values(componentHistory);
