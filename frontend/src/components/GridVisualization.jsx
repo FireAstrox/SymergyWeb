@@ -357,12 +357,13 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         className={`p-4 rounded-lg ${status ? 'bg-navy-900' : 'bg-red-900'} text-white mb-4 relative cursor-pointer hover:shadow-lg transition-shadow`}
         onClick={onClick}
       >
-        {/* Left side content */}
-        <div className="flex">
-          <div className="flex-grow">
-            {/* Component name */}
-            <h3 className="font-semibold">{name}</h3>
-            
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold">{name}</h3>
+          <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
+        </div>
+        
+        <div className="flex justify-between items-start mt-2">
+          <div>
             {/* Status indicator */}
             <div className="flex items-center mt-2 mb-3">
               <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'} mr-2`} />
@@ -377,17 +378,22 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
             </div>
           </div>
           
-          {/* Right side SVG */}
-          <div className="absolute top-4 right-0" style={{ width: '70px', height: '70px' }}>
-            <img
-              src={poleIcon}
-              alt="Pole Icon"
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)'
-              }}
-            />
+          {/* Pole icon with improved styling */}
+          <div className="ml-2" style={{ width: '100px', height: '100px' }}>
+            <div className="relative" style={{ width: '200%', height: '200%', top: '-140px' }}>
+              <img
+                src={poleIcon}
+                alt="Pole Icon"
+                style={{ 
+                  width: '180%', 
+                  height: '180%', 
+                  filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
+                  position: 'absolute',
+                  top: '0',
+                  left: '-20%'
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
