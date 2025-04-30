@@ -1,6 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
+
+const CustomTooltip = ({ active, payload, label, dataKey }) => {
+  if (active && payload && payload.length) {
+    // Get the appropriate unit based on the data key
+    const units = {
+      voltage: 'V',
+      current: 'A',
+      power: 'kW',
+      energy: 'kWh'
+    };
+    
+    const unit = units[dataKey] || '';
+    const value = payload[0].value;
+    
+    return (
+      <div className="bg-navy-900 text-white p-2 rounded shadow-lg border border-yellow-500">
+        <p className="text-sm">{`Time: ${label}`}</p>
+        <p className="text-sm font-semibold">{`${dataKey.charAt(0).toUpperCase() + dataKey.slice(1)}: ${value.toFixed(2)} ${unit}`}</p>
+      </div>
+    );
+  }
+  
+  return null;
+};
 
 const ComponentDetails = () => {
   const { componentId } = useParams();
@@ -157,10 +181,64 @@ const ComponentDetails = () => {
       return [0, 10]; // Default if no non-zero values
     }
     
+    // Check for abnormally large values (likely data errors)
+    // Most electrical measurements shouldn't exceed these thresholds in a normal grid
+    const thresholds = {
+      'voltage': 1000,    // 1000V is high for most distribution systems
+      'current': 10000,   // 10000A is extremely high
+      'power': 10000,     // 10000kW is very high for most components
+      'energy': 100000    // 100000kWh is very high for short-term measurements
+    };
+    
+    const threshold = thresholds[dataKey] || 1000;
     const minValue = Math.min(...nonZeroValues);
     const maxValue = Math.max(...nonZeroValues);
     
-    // Calculate buffer amount
+    // If values are abnormally high, use a more reasonable approach
+    if (maxValue > threshold) {
+      // For extremely large values, look at the actual data pattern
+      // Sort values to find median and quartiles
+      const sortedValues = [...nonZeroValues].sort((a, b) => a - b);
+      const medianIndex = Math.floor(sortedValues.length / 2);
+      const medianValue = sortedValues[medianIndex];
+      
+      // If median is also very large, we might need to use a fixed scale
+      if (medianValue > threshold) {
+        // Check if the data has meaningful variations or is mostly flat
+        const variations = nonZeroValues.map(v => Math.abs(v - medianValue));
+        const avgVariation = variations.reduce((sum, v) => sum + v, 0) / variations.length;
+        
+        // If variations are small relative to the values, use a scale that shows these variations
+        if (avgVariation / medianValue < 0.1) { // Less than 10% variation
+          // Find the min and max of recent values to focus on current trends
+          const recentValues = nonZeroValues.slice(-20); // Last 20 points
+          const recentMin = Math.min(...recentValues);
+          const recentMax = Math.max(...recentValues);
+          const recentRange = recentMax - recentMin;
+          
+          // Use a range that shows the variations clearly
+          return [
+            Math.max(0, recentMin - recentRange * 0.2),
+            recentMax + recentRange * 0.2
+          ];
+        }
+        
+        // For data with large variations, use a more typical range for the measurement type
+        const typicalRanges = {
+          'voltage': [0, 500],    // 0-500V
+          'current': [0, 100],    // 0-100A
+          'power': [0, 1000],     // 0-1000kW
+          'energy': [0, 10000]    // 0-10000kWh
+        };
+        
+        return typicalRanges[dataKey] || [0, 100];
+      }
+      
+      // Use median as reference and add buffer
+      return [0, medianValue * 2];
+    }
+    
+    // For normal values, use standard approach
     const range = maxValue - minValue;
     const bufferAmount = range * buffer;
     
@@ -184,6 +262,13 @@ const ComponentDetails = () => {
   
   // Check if this is a pole component
   const isPole = component?.category === 'pole' || (componentId && componentId.includes('pole'));
+  
+  // Format Y-axis tick values
+  const formatYAxisTick = (value) => {
+    // For values less than 10, show up to 1 decimal place
+    // For larger values, show only integers
+    return value < 10 ? value.toFixed(1) : Math.round(value);
+  };
   
   if (loading) {
     return (
@@ -275,13 +360,16 @@ const ComponentDetails = () => {
                 domain={calculateYDomain('voltage')}
                 tickCount={7}
                 tick={{ fontSize: 12 }}
+                tickFormatter={formatYAxisTick}
               />
+              <Tooltip content={<CustomTooltip dataKey="voltage" />} />
               <Line 
                 type="monotone" 
                 dataKey="voltage" 
                 stroke="#FFD700" 
                 strokeWidth={2}
                 dot={false} 
+                activeDot={{ r: 6, stroke: '#FFD700', strokeWidth: 2, fill: '#fff' }}
                 isAnimationActive={false}
               />
             </LineChart>
@@ -309,13 +397,16 @@ const ComponentDetails = () => {
                     domain={calculateYDomain('current')}
                     tickCount={7}
                     tick={{ fontSize: 12 }}
+                    tickFormatter={formatYAxisTick}
                   />
+                  <Tooltip content={<CustomTooltip dataKey="current" />} />
                   <Line 
                     type="monotone" 
                     dataKey="current" 
                     stroke="#FF4500" 
                     strokeWidth={2}
                     dot={false} 
+                    activeDot={{ r: 6, stroke: '#FF4500', strokeWidth: 2, fill: '#fff' }}
                     isAnimationActive={false}
                   />
                 </LineChart>
@@ -340,13 +431,16 @@ const ComponentDetails = () => {
                     domain={calculateYDomain('power')}
                     tickCount={7}
                     tick={{ fontSize: 12 }}
+                    tickFormatter={formatYAxisTick}
                   />
+                  <Tooltip content={<CustomTooltip dataKey="power" />} />
                   <Line 
                     type="monotone" 
                     dataKey="power" 
                     stroke="#4CAF50" 
                     strokeWidth={2}
                     dot={false} 
+                    activeDot={{ r: 6, stroke: '#4CAF50', strokeWidth: 2, fill: '#fff' }}
                     isAnimationActive={false}
                   />
                 </LineChart>
@@ -371,13 +465,16 @@ const ComponentDetails = () => {
                     domain={calculateYDomain('energy')}
                     tickCount={7}
                     tick={{ fontSize: 12 }}
+                    tickFormatter={formatYAxisTick}
                   />
+                  <Tooltip content={<CustomTooltip dataKey="energy" />} />
                   <Line 
                     type="monotone" 
                     dataKey="energy" 
                     stroke="#1E90FF" 
                     strokeWidth={2}
                     dot={false} 
+                    activeDot={{ r: 6, stroke: '#1E90FF', strokeWidth: 2, fill: '#fff' }}
                     isAnimationActive={false}
                   />
                 </LineChart>
