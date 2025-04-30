@@ -338,12 +338,12 @@ const ComponentDetailModal = ({ component, measurements, onClose }) => {
   );
 };
 
-// Update the ComponentCard to be clickable
+// Update the ComponentCard to use the actual category from the component data
 const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, componentId, category, onClick }) => {
   const voltageColor = getVoltageStatusColor(voltage, status);
+  
+  // Determine component type based on ID for icon selection only
   const isAirport = componentId && componentId.includes('airport');
-  const isMunicipalOrCommercial = category === 'municipal' || category === 'commercial';
-  const isResidential = category === 'residential';
   const isGenerator = componentId && componentId.includes('generator');
   const isHydro = componentId && componentId.includes('hydro_plant');
   const isSolar = componentId && componentId.includes('solar');
@@ -361,6 +361,13 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
           <div className="flex-grow">
             {/* Component name */}
             <h3 className="font-semibold">{name}</h3>
+            
+            {/* Category badge */}
+            <div className="mt-1 mb-2">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500">
+                {category || 'pole'}
+              </span>
+            </div>
             
             {/* Status indicator */}
             <div className="flex items-center mt-2 mb-3">
@@ -404,7 +411,14 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         <div className={`h-2 w-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-500'}`} />
       </div>
       
-      {/* Airport SVG for airport components */}
+      {/* Category badge */}
+      <div className="mt-1 mb-2">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500">
+          {category || 'unknown'}
+        </span>
+      </div>
+      
+      {/* Select appropriate icon based on component ID */}
       {isAirport && (
         <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
           <img
@@ -419,7 +433,6 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         </div>
       )}
       
-      {/* Generator SVG for generator components */}
       {isGenerator && (
         <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
           <img
@@ -434,7 +447,6 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         </div>
       )}
       
-      {/* Hydro SVG for hydro plant components */}
       {isHydro && (
         <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
           <img
@@ -449,7 +461,6 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         </div>
       )}
       
-      {/* Solar SVG for solar components */}
       {isSolar && (
         <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
           <img
@@ -464,7 +475,6 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         </div>
       )}
       
-      {/* Wind SVG for wind turbine components */}
       {isWind && (
         <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
           <img
@@ -479,8 +489,8 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
         </div>
       )}
       
-      {/* Big House SVG for municipal or commercial loads */}
-      {!isAirport && !isGenerator && !isHydro && !isSolar && !isWind && isMunicipalOrCommercial && (
+      {/* Default building icon for commercial/municipal loads that don't have a specific icon */}
+      {!isAirport && !isGenerator && !isHydro && !isSolar && !isWind && (category === 'commercial' || category === 'municipal') && (
         <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
           <img
             src={bigHouseIcon}
@@ -495,7 +505,7 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
       )}
       
       {/* House SVG for residential loads */}
-      {isResidential && (
+      {category === 'residential' && (
         <div className="absolute top-4 right-10" style={{ width: '70px', height: '70px' }}>
           <img
             src={houseIcon}
@@ -629,16 +639,8 @@ const GridVisualization = ({ section }) => {
 
       // For loads, we want to use the actual component type and category
       if (component.type === 'load') {
-        if (!acc.load) acc.load = {};
-        
-        // Special handling for municipal vs commercial categorization
-        let category = component.category;
-        if (['church', 'airport', 'town_hall', 'post_office', 'water_pump'].includes(id)) {
-          category = 'municipal';
-        }
-        
-        if (!acc.load[category]) acc.load[category] = [];
-        acc.load[category].push([id, component]);
+        if (!acc.load) acc.load = [];
+        acc.load.push([id, component]);
       }
       // For poles - check if the ID contains 'pole'
       else if (id.includes('pole')) {
@@ -663,15 +665,32 @@ const GridVisualization = ({ section }) => {
     
     const measurements = gridData.measurements[id] || {
       status: [true],
-      timestamps: [],
-      voltage: [0],
+      voltage: [120],
       current: [0],
       power: [0],
       energy: [0]
     };
-    const lastIndex = measurements.status?.length - 1;
+    
+    // Check if this is a pole component
     const isPole = id.includes('pole');
-
+    
+    // Get the last index of measurements
+    const lastIndex = measurements.status?.length - 1 || 0;
+    
+    // Log the component data to debug
+    console.log(`Component ${id}:`, {
+      name: component.name,
+      category: component.category,
+      type: component.type,
+      measurements: {
+        status: measurements.status?.[lastIndex],
+        voltage: measurements.voltage?.[lastIndex],
+        current: measurements.current?.[lastIndex],
+        power: measurements.power?.[lastIndex],
+        energy: measurements.energy?.[lastIndex]
+      }
+    });
+    
     return (
       <MemoizedComponentCard
         key={id}
@@ -707,17 +726,14 @@ const GridVisualization = ({ section }) => {
         );
 
       case 'loads':
-        const loadCategories = groupedComponents.load || {};
+        const loads = groupedComponents.load || [];
         return (
-          <div>
-            {Object.entries(loadCategories).map(([category, components]) => (
-              <div key={category} className="mb-6 last:mb-0">
-                <h3 className="text-lg font-semibold mb-4 capitalize text-navy-900">{category}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {components.map(([id, component]) => createComponentCard(id, component))}
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {loads.length > 0 ? (
+              loads.map(([id, component]) => createComponentCard(id, component))
+            ) : (
+              <div className="text-navy-900">No loads found</div>
+            )}
           </div>
         );
 

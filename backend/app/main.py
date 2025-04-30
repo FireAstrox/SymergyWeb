@@ -197,6 +197,14 @@ def on_message(client, userdata, msg):
                     if "residential" in parts[3]:
                         category = "residential"
                         display_name = f"Residential {parts[3].replace('residential', '')}"
+                    # Add municipal category for specific components
+                    elif parts[3] in ["airport", "water_pump", "town_hall", "post_office"]:
+                        category = "municipal"
+                        display_name = parts[3].replace('_', ' ').title()
+                    # Add industrial category for specific components
+                    elif parts[3] in ["lumber_mill", "factory", "warehouse", "plant"]:
+                        category = "industrial"
+                        display_name = parts[3].replace('_', ' ').title()
                     else:
                         category = "commercial"
                         display_name = parts[3].replace('_', ' ').title()
