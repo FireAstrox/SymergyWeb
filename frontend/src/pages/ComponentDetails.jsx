@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -31,11 +31,22 @@ const ComponentDetails = () => {
   const [component, setComponent] = useState(null);
   const [measurements, setMeasurements] = useState(null);
   const [loading, setLoading] = useState(true);
+  const componentHistoriesRef = useRef({});
+  
+  // Format Y-axis tick values
+  const formatYAxisTick = (value) => {
+    return value < 10 ? value.toFixed(1) : Math.round(value);
+  };
   
   // Fetch component data
   useEffect(() => {
     let isMounted = true;
     let fetchController = null;
+
+    // Initialize history for this component if it doesn't exist yet
+    if (!componentHistoriesRef.current[componentId]) {
+      componentHistoriesRef.current[componentId] = {};
+    }
 
     const fetchData = async () => {
       try {
@@ -76,6 +87,12 @@ const ComponentDetails = () => {
         if (isMounted) {
           setComponent(componentData);
           setMeasurements(measurementData);
+          
+          // Process and store the new measurement data in our rolling history
+          if (measurementData) {
+            updateTimeSeriesHistory(componentId, measurementData);
+          }
+          
           setLoading(false);
         }
       } catch (error) {
@@ -100,71 +117,84 @@ const ComponentDetails = () => {
     };
   }, [componentId]);
   
-  // Format time series data for charts
-  const formatTimeSeriesData = useCallback(() => {
-    if (!measurements) return [];
-    
-    const timestamps = measurements.timestamps || [];
-    const voltages = measurements.voltage || [];
-    const currents = measurements.current || [];
-    const powers = measurements.power || [];
-    const energies = measurements.energy || [];
+  // Function to update the rolling history with new data
+  const updateTimeSeriesHistory = useCallback((id, newMeasurements) => {
+    const timestamps = newMeasurements.timestamps || [];
+    const voltages = newMeasurements.voltage || [];
+    const currents = newMeasurements.current || [];
+    const powers = newMeasurements.power || [];
+    const energies = newMeasurements.energy || [];
     
     // Get the last index
     const lastIndex = timestamps.length - 1;
     
-    // Calculate how many data points to show (5 minutes worth)
-    const dataPoints = Math.min(300, timestamps.length); // 5 minutes = 300 seconds
-    
-    // Calculate the starting index
-    const startIndex = Math.max(0, lastIndex - dataPoints + 1);
-    
-    const data = [];
-    
-    for (let i = startIndex; i <= lastIndex; i++) {
-      if (timestamps[i]) {
-        // Parse the timestamp - handle both ISO strings and numeric timestamps
-        let timestamp;
-        try {
-          // Try to parse as ISO string first
-          timestamp = new Date(timestamps[i]);
-          // Check if valid date
-          if (isNaN(timestamp.getTime())) {
-            // If not valid, try as numeric timestamp
-            timestamp = new Date(Number(timestamps[i]));
-          }
-        } catch (e) {
-          // Fallback to current time if parsing fails
-          console.warn("Failed to parse timestamp:", timestamps[i]);
-          timestamp = new Date();
+    // Only process if we have data
+    if (lastIndex >= 0 && timestamps[lastIndex]) {
+      // Process the latest data point
+      let timestamp;
+      try {
+        // Try to parse as ISO string first
+        timestamp = new Date(timestamps[lastIndex]);
+        // Check if valid date
+        if (isNaN(timestamp.getTime())) {
+          // If not valid, try as numeric timestamp
+          timestamp = new Date(Number(timestamps[lastIndex]));
         }
-        
-        // Format time for display - ensure it's in local time
-        const timeStr = timestamp.toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          second: '2-digit',
-          hour12: false // Use 24-hour format for consistency
-        });
-        
-        data.push({
-          time: timeStr,
-          timestamp: timestamp.getTime(), // Store raw timestamp for sorting
-          voltage: voltages[i] || 0,
-          current: currents[i] || 0,
-          power: powers[i] || 0,
-          energy: energies[i] || 0,
-        });
+      } catch (e) {
+        // Fallback to current time if parsing fails
+        console.warn("Failed to parse timestamp:", timestamps[lastIndex]);
+        timestamp = new Date();
       }
+      
+      // Format time for display
+      const timeStr = timestamp.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: false
+      });
+      
+      // Create a unique key for this timestamp to avoid duplicates
+      const timeKey = timestamp.getTime().toString();
+      
+      // Add the new data point to our history for this component
+      componentHistoriesRef.current[id][timeKey] = {
+        time: timeStr,
+        timestamp: timestamp.getTime(),
+        voltage: voltages[lastIndex] || 0,
+        current: currents[lastIndex] || 0,
+        power: powers[lastIndex] || 0,
+        energy: energies[lastIndex] || 0,
+      };
+      
+      // Prune old data - keep only the last 5 minutes (300 seconds)
+      const cutoffTime = timestamp.getTime() - (5 * 60 * 1000);
+      
+      // Filter out old entries
+      Object.keys(componentHistoriesRef.current[id]).forEach(key => {
+        if (componentHistoriesRef.current[id][key].timestamp < cutoffTime) {
+          delete componentHistoriesRef.current[id][key];
+        }
+      });
     }
+  }, []);
+  
+  // Convert the rolling history object to an array for the charts
+  const getTimeSeriesData = useCallback(() => {
+    // Get the history for the current component
+    const componentHistory = componentHistoriesRef.current[componentId] || {};
+    
+    // Convert the history object to an array
+    const dataArray = Object.values(componentHistory);
     
     // Sort by timestamp to ensure chronological order
-    data.sort((a, b) => a.timestamp - b.timestamp);
+    dataArray.sort((a, b) => a.timestamp - b.timestamp);
     
-    return data;
-  }, [measurements]);
+    return dataArray;
+  }, [componentId]);
   
-  const timeSeriesData = formatTimeSeriesData();
+  // Get the time series data for the charts
+  const timeSeriesData = getTimeSeriesData();
   
   // Calculate Y-axis domain based on data
   const calculateYDomain = useCallback((dataKey, buffer = 0.2) => {
@@ -262,13 +292,6 @@ const ComponentDetails = () => {
   
   // Check if this is a pole component
   const isPole = component?.category === 'pole' || (componentId && componentId.includes('pole'));
-  
-  // Format Y-axis tick values
-  const formatYAxisTick = (value) => {
-    // For values less than 10, show up to 1 decimal place
-    // For larger values, show only integers
-    return value < 10 ? value.toFixed(1) : Math.round(value);
-  };
   
   if (loading) {
     return (
