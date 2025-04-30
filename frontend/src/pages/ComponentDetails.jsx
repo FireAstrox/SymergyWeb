@@ -214,12 +214,11 @@ const ComponentDetails = () => {
           const recentValues = nonZeroValues.slice(-20); // Last 20 points
           const recentMin = Math.min(...recentValues);
           const recentMax = Math.max(...recentValues);
-          const recentRange = recentMax - recentMin;
           
-          // Use a range that shows the variations clearly
+          // Use a range that shows the variations clearly with max value 10 units higher
           return [
-            Math.max(0, recentMin - recentRange * 0.2),
-            recentMax + recentRange * 0.2
+            Math.max(0, recentMin - 1),
+            recentMax + 10
           ];
         }
         
@@ -234,22 +233,15 @@ const ComponentDetails = () => {
         return typicalRanges[dataKey] || [0, 100];
       }
       
-      // Use median as reference and add buffer
-      return [0, medianValue * 2];
+      // Use median as reference and add 10 units
+      return [0, medianValue + 10];
     }
     
-    // For normal values, use standard approach
-    const range = maxValue - minValue;
-    const bufferAmount = range * buffer;
-    
-    // Set min to 0 or slightly below the minimum value
+    // For normal values, always set max to the maximum value plus 10 units
     const yMin = 0; // Always start at 0 for these metrics
+    const yMax = maxValue + 10; // Always add 10 units to the maximum value
     
-    // Set max to the maximum value plus a buffer
-    const yMax = maxValue + bufferAmount;
-    
-    // Ensure we have a minimum range to prevent flat lines
-    return [yMin, Math.max(yMax, minValue + 1)];
+    return [yMin, yMax];
   }, [timeSeriesData]);
   
   // Get the latest values
