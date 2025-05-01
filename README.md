@@ -1,8 +1,10 @@
+![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdB5pnmbTegv5m-mqhKm2bnjl4osXe0E_cp29gg4ku0bHInhAcRsHsvzeUrU56p_HLYkkTCZgOAOZ7Ws9UjTkus41zw6W-TYkTZK6tmns7-C8i825m-Vx7-eGuW6xdKifPImp5p?key=m95eLiTkQy0GqG0wvsxMFrQe)
 # SymergyWeb - Microgrid Visualization Platform
 
 SymergyWeb is a comprehensive web application for visualizing and monitoring microgrid systems. It provides real-time data visualization of electrical components including power sources, loads, and distribution infrastructure.
 
-![SymergyWeb Dashboard]()
+![SymergyWeb Dashboard](https://lh7-rt.googleusercontent.com/docsz/AD_4nXcLn-UpreVrsxli_n8Wcak2ULt5M_R5DioIipfQYUsfu1eX-DvgI45rkUd3D6fl7sLJpnA4gehRTuga7bTd7yEkghyIByGFSMZwjZthQC5zx9c1yhXW1bvqPDvdBd8KgbflVUXGnw?key=m95eLiTkQy0GqG0wvsxMFrQe)
+
 
 ## Features
 
@@ -120,14 +122,17 @@ The frontend consists of several key components:
 
 #### SVG Icons
 The application uses custom SVG icons for different component types:
-- `frontend/src/svg/pole_icon.svg`: Distribution poles
-- `frontend/src/svg/house_icon.svg`: Residential loads
-- `frontend/src/svg/big_house_icon.svg`: Commercial/municipal loads
-- `frontend/src/svg/industrial.svg`: Industrial loads
-- `frontend/src/svg/generator.svg`: Generator sources
-- `frontend/src/svg/hydro.svg`: Hydro power sources
-- `frontend/src/svg/solar.svg`: Solar power sources
-- `frontend/src/svg/wind_icon.svg`: Wind power sources
+- `frontend/src/svg/airport.svg`: Airport load
+- `frontend/src/svg/big_house_icon.svg`: Commercial/municipal loads  
+- `frontend/src/svg/fuel_tank.svg`: Fuel Tank
+- `frontend/src/svg/generator.svg`: Generator sources  
+- `frontend/src/svg/house_icon.svg`: Residential loads  
+- `frontend/src/svg/hydro.svg`: Hydro power sources  
+- `frontend/src/svg/industrial.svg`: Industrial loads  
+- `frontend/src/svg/logo.svg`: Application logo  
+- `frontend/src/svg/pole_icon.svg`: Distribution poles  
+- `frontend/src/svg/solar.svg`: Solar power sources  
+- `frontend/src/svg/wind_icon.svg`: Wind power sources  
 
 ## Development
 
