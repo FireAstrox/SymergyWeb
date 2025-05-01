@@ -213,6 +213,3 @@ You can set these variables in a `.env` file in the backend directory or through
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
-
-
-For questions or support, please open an issue on the GitHub repository.
