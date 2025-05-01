@@ -729,7 +729,7 @@ const MapView = () => {
         /* Make the map container fill the available space below navbar */
         .map-container {
           position: fixed;
-          top: 80px; /* Height of the navbar */
+          top: 90px; /* Height of the navbar */
           left: 0;
           right: 0;
           bottom: 0;
