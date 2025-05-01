@@ -708,15 +708,174 @@ const MapView = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-5rem)]">
+      <div className="flex items-center justify-center h-screen w-screen">
         <div className="text-xl text-navy-900">Loading map data...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-[calc(100vh-5rem)] w-full bg-gray-100">
+    <div className="map-container">
       <style jsx global>{`
+        /* Reset default margins and padding */
+        body, html {
+          margin: 0;
+          padding: 0;
+          height: 100%;
+          width: 100%;
+          overflow: hidden;
+        }
+
+        /* Make the map container fill the available space below navbar */
+        .map-container {
+          position: fixed;
+          top: 80px; /* Height of the navbar */
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          z-index: 0;
+        }
+
+        /* Ensure the Leaflet container fills its parent */
+        .leaflet-container {
+          height: 100% !important;
+          width: 100% !important;
+        }
+
+        /* Component List Styles */
+        .component-list-container {
+          position: fixed;
+          top: 160px; /* Positioned below zoom controls */
+          left: 10px;
+          z-index: 1000;
+          background-color: rgba(25, 32, 71, 0.9);
+          color: white;
+          border-radius: 5px;
+          box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+          transition: all 0.3s ease;
+          max-height: calc(100vh - 180px); /* Adjusted to account for new top position */
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* Legend styles */
+        .legend {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          z-index: 1000;
+          background-color: rgba(25, 32, 71, 0.9);
+          color: white;
+          padding: 10px;
+          border-radius: 5px;
+          box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+          line-height: 1.5;
+          max-height: calc(100vh - 40px);
+          overflow-y: auto;
+        }
+
+        .component-list-container.open {
+          width: 300px;
+        }
+
+        .component-list-container.closed {
+          width: auto;
+        }
+
+        .component-list-toggle {
+          padding: 10px;
+          cursor: pointer;
+          font-weight: bold;
+          white-space: nowrap;
+          color: white;
+        }
+
+        .component-list-content {
+          padding: 10px;
+          overflow-y: auto;
+          max-height: calc(100vh - 200px);
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .component-list-search {
+          position: relative;
+        }
+
+        .component-list-search input {
+          width: 100%;
+          padding: 8px;
+          border-radius: 4px;
+          border: 1px solid #ccc;
+          background-color: rgba(255, 255, 255, 0.9);
+          color: #333;
+        }
+
+        .clear-search {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #666;
+          cursor: pointer;
+        }
+
+        .component-list-count {
+          font-size: 12px;
+          color: #ccc;
+        }
+
+        .component-list-groups {
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .component-group {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .component-group-header {
+          font-weight: bold;
+          font-size: 14px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+          padding-bottom: 3px;
+          color: white;
+        }
+
+        .component-group-items {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          padding-left: 5px;
+        }
+
+        .component-item {
+          padding: 5px;
+          cursor: pointer;
+          border-radius: 3px;
+          font-size: 13px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          color: white;
+        }
+
+        .component-item:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .component-item.selected {
+          background-color: rgba(255, 255, 255, 0.2);
+          font-weight: bold;
+        }
+
         .custom-popup .leaflet-popup-content-wrapper {
           background-color: rgba(25, 32, 71, 0.9);
           color: white;
@@ -777,16 +936,6 @@ const MapView = () => {
           text-decoration: none;
         }
         
-        /* Legend styles */
-        .legend {
-          background-color: rgba(25, 32, 71, 0.9);
-          color: white;
-          padding: 10px;
-          border-radius: 5px;
-          box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-          line-height: 1.5;
-        }
-        
         .legend-container {
           max-width: 200px;
         }
@@ -831,120 +980,6 @@ const MapView = () => {
           height: 2px;
           background-color: #3388ff;
           margin-right: 8px;
-        }
-        
-        /* Component List Styles */
-        .component-list-container {
-          position: absolute;
-          top: 190px;
-          left: 10px;
-          z-index: 1000;
-          background-color: rgba(25, 32, 71, 0.9);
-          color: white;
-          border-radius: 5px;
-          box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-          transition: all 0.3s ease;
-          max-height: calc(100vh - 200px);
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .component-list-container.open {
-          width: 300px;
-        }
-        
-        .component-list-container.closed {
-          width: auto;
-        }
-        
-        .component-list-toggle {
-          padding: 10px;
-          cursor: pointer;
-          font-weight: bold;
-          white-space: nowrap;
-        }
-        
-        .component-list-content {
-          padding: 10px;
-          overflow-y: auto;
-          max-height: calc(100vh - 200px);
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        
-        .component-list-search {
-          position: relative;
-        }
-        
-        .component-list-search input {
-          width: 100%;
-          padding: 8px;
-          border-radius: 4px;
-          border: 1px solid #ccc;
-          background-color: rgba(255, 255, 255, 0.9);
-          color: #333;
-        }
-        
-        .clear-search {
-          position: absolute;
-          right: 8px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          color: #666;
-          cursor: pointer;
-        }
-        
-        .component-list-count {
-          font-size: 12px;
-          color: #ccc;
-        }
-        
-        .component-list-groups {
-          display: flex;
-          flex-direction: column;
-          gap: 15px;
-        }
-        
-        .component-group {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-        
-        .component-group-header {
-          font-weight: bold;
-          font-size: 14px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-          padding-bottom: 3px;
-        }
-        
-        .component-group-items {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          padding-left: 5px;
-        }
-        
-        .component-item {
-          padding: 5px;
-          cursor: pointer;
-          border-radius: 3px;
-          font-size: 13px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        
-        .component-item:hover {
-          background-color: rgba(255, 255, 255, 0.1);
-        }
-        
-        .component-item.selected {
-          background-color: rgba(255, 255, 255, 0.2);
-          font-weight: bold;
         }
       `}</style>
       
