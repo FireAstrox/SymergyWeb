@@ -1,4 +1,7 @@
+<<<<<<< HEAD
+=======
 
+>>>>>>> origin/UI-Fix
 ![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdB5pnmbTegv5m-mqhKm2bnjl4osXe0E_cp29gg4ku0bHInhAcRsHsvzeUrU56p_HLYkkTCZgOAOZ7Ws9UjTkus41zw6W-TYkTZK6tmns7-C8i825m-Vx7-eGuW6xdKifPImp5p?key=m95eLiTkQy0GqG0wvsxMFrQe)
 # SymergyWeb - Microgrid Visualization Platform
 
