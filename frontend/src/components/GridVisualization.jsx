@@ -361,12 +361,12 @@ const ComponentDetailModal = ({ component, measurements, onClose }) => {
 const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, componentId, category, onClick }) => {
   const voltageColor = getVoltageStatusColor(voltage, status);
   
-  // Determine component type based on ID for icon selection only
+  // Determine component type based on category and ID
   const isAirport = componentId && componentId.includes('airport');
-  const isGenerator = componentId && componentId.includes('generator');
-  const isHydro = componentId && componentId.includes('hydro_plant');
-  const isSolar = componentId && componentId.includes('solar');
-  const isWind = componentId && componentId.includes('turbine');
+  const isGenerator = category === 'diesel' || (componentId && componentId.includes('generator'));
+  const isHydro = category === 'hydro' || (componentId && componentId.includes('hydro_plant'));
+  const isSolar = category === 'solar' || (componentId && componentId.includes('solar'));
+  const isWind = category === 'wind' || (componentId && componentId.includes('turbine'));
   
   // Create a specific layout for poles
   if (isPole) {
