@@ -58,12 +58,15 @@ SymergyWeb consists of two main components:
    MQTT_PASSWORD=your-mqtt-password
    ```
 
-3. Build and start the containers:
+3. Build and start the containers [^note]:
+
    ```bash
    docker-compose -f docker-compose.prod.yml up -d --build
    ```
 
 4. The application will be available at `https://your-server-ip`
+
+[^note]: This docker-compose.prod.yml file has not been tested and is not gauranteed to work
 
 ## MQTT Configuration
 
