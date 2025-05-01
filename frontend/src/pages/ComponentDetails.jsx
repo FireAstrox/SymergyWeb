@@ -133,19 +133,33 @@ const ComponentDetails = () => {
             // If not valid, try as numeric timestamp
             timestamp = new Date(Number(timestamps[i]));
           }
+          
+          // Convert to AKST/AKDT by adjusting for timezone offset
+          // AKST is UTC-9, AKDT is UTC-8
+          const date = new Date();
+          // Check if we're in DST in Alaska
+          const jan = new Date(date.getFullYear(), 0, 1).getTimezoneOffset();
+          const jul = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
+          const isDST = date.getTimezoneOffset() < Math.max(jan, jul);
+          
+          const akOffset = isDST ? -8 * 60 : -9 * 60; // AKDT/AKST offset in minutes
+          const localOffset = timestamp.getTimezoneOffset();
+          const offsetDiff = localOffset - akOffset;
+          
+          // Adjust the timestamp
+          timestamp = new Date(timestamp.getTime() + offsetDiff * 60000);
+          
         } catch (e) {
           // Fallback to current time if parsing fails
           console.warn("Failed to parse timestamp:", timestamps[i]);
           timestamp = new Date();
         }
         
-        // Format time for display - ensure it's in local time
-        const timeStr = timestamp.toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          second: '2-digit',
-          hour12: false // Use 24-hour format for consistency
-        });
+        // Format time string in 24-hour format
+        const hours = String(timestamp.getHours()).padStart(2, '0');
+        const minutes = String(timestamp.getMinutes()).padStart(2, '0');
+        const seconds = String(timestamp.getSeconds()).padStart(2, '0');
+        const timeStr = `${hours}:${minutes}:${seconds}`;
         
         data.push({
           time: timeStr,
