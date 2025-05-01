@@ -70,6 +70,8 @@ SymergyWeb consists of two main components:
 
 ## MQTT Configuration
 
+##### For the full document please reference symergyweb/MQTT STANDARD/mqtt_standard.md
+
 The system expects MQTT messages in the following format:
 
 Topic: symergygrid/components/{type}/{component_id}/{measurement_type}
