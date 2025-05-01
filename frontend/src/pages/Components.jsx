@@ -101,7 +101,8 @@ const Components = () => {
   const filteredGroups = useMemo(() => {
     // First group the components
     const grouped = Object.entries(components).reduce((acc, [id, component]) => {
-      if (id === "meterstructure") return acc;
+      // Skip meterstructure, geojson, and map category components
+      if (id === "meterstructure" || id === "geojson" || component.category === "map") return acc;
       
       const category = component.category || 'other';
       if (!acc[category]) {
