@@ -1,13 +1,13 @@
-FROM node:18-alpine
+FROM node:16-alpine
 
 WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies including necessary type definitions
+# Install dependencies
 RUN npm install && \
-    npm install --save-dev @types/react @types/react-dom @types/node && \
+    npm install --save-dev @babel/plugin-proposal-private-property-in-object@7.21.11 && \
     npm cache clean --force
 
 # Copy the rest of the application

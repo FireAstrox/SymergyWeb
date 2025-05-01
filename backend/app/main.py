@@ -1,38 +1,192 @@
-from flask import Flask, jsonify
+"""
+Main backend application for the Symergy Web system.
+This Flask application serves as the central hub for managing and monitoring the microgrid system.
+It handles MQTT communication, data storage, and provides REST API endpoints for the frontend.
+
+Key features:
+- MQTT client for real-time component monitoring
+- Health monitoring system for connection reliability
+- REST API endpoints for frontend data access
+- Component data management and measurement history
+- GeoJSON and meter structure handling
+
+The application maintains two main data structures:
+1. components: Dictionary storing component metadata and configuration
+2. measurements: Dictionary storing time-series data for each component
+"""
+
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import paho.mqtt.client as mqtt
 import json
 from threading import Thread
 from collections import defaultdict, deque
 from datetime import datetime
+import time
+import threading
+import os
+from dotenv import load_dotenv
 
 app = Flask(__name__)
 CORS(app)
 
-# Store component information
+# Store component information and their metadata
 components = {}
-components_loaded = False # Have we loaded the microgrid yet?
+components_loaded = False  # Flag to track if initial microgrid data has been loaded
 
-# Store measurement history for each component
-MAX_HISTORY = 100
+# Store measurement history for each component with a rolling window
+MAX_HISTORY = 100  # Maximum number of measurements to keep in history
 measurements = defaultdict(lambda: {
-    "demand": deque(maxlen=MAX_HISTORY),  # Amps
-    "voltage": deque(maxlen=MAX_HISTORY), # Volts
-    "power": deque(maxlen=MAX_HISTORY),   # kW
-    "energy": deque(maxlen=MAX_HISTORY),  # kWh
-    "status": deque(maxlen=MAX_HISTORY),  # bool
-    "timestamps": deque(maxlen=MAX_HISTORY)
+    "demand": deque(maxlen=MAX_HISTORY),  # Current demand in Amps
+    "voltage": deque(maxlen=MAX_HISTORY), # Voltage readings in Volts
+    "power": deque(maxlen=MAX_HISTORY),   # Power consumption in kW
+    "energy": deque(maxlen=MAX_HISTORY),  # Energy usage in kWh
+    "status": deque(maxlen=MAX_HISTORY),  # Component operational status
+    "timestamps": deque(maxlen=MAX_HISTORY)  # Timestamps for each measurement
 })
+
+# Add this class directly in main.py instead of importing it
+class HealthMonitor(threading.Thread):
+    def __init__(self, mqtt_client):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.mqtt_client = mqtt_client
+        self.last_message_time = time.time()
+        self.running = True
+        
+    def message_received(self):
+        """Call this whenever a message is received"""
+        self.last_message_time = time.time()
+        
+    def run(self):
+        """Monitor health and restart connections if needed"""
+        while self.running:
+            try:
+                current_time = time.time()
+                # If no messages for 30 seconds, reconnect MQTT
+                if current_time - self.last_message_time > 30:
+                    print("No MQTT messages received for 30 seconds, reconnecting...")
+                    try:
+                        self.mqtt_client.disconnect()
+                        time.sleep(1)
+                        self.mqtt_client.reconnect()
+                        print("MQTT reconnection attempted")
+                    except Exception as e:
+                        print(f"Error during MQTT reconnection: {e}")
+                
+                # Check if Flask is responding
+                try:
+                    response = requests.get("http://localhost:5000/health", timeout=2)
+                    if response.status_code != 200:
+                        print(f"Health check failed with status {response.status_code}")
+                except Exception as e:
+                    print(f"Health check request failed: {e}")
+                    
+            except Exception as e:
+                print(f"Error in health monitor: {e}")
+                
+            # Sleep for 10 seconds before next check
+            time.sleep(10)
+            
+    def stop(self):
+        self.running = False
 
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
-    client.subscribe("#")  # Subscribe to all topics as per the new subscription pattern
+    # More specific subscription instead of "#" which is too broad
+    client.subscribe("symergygrid/components/+/+/+")
+    client.subscribe("symergygrid/meterstructure")  # Add subscription for meter structure
+    client.subscribe("symergygrid/geojson")  # Add subscription for GeoJSON data
+    print("Subscribed to component topics")
+
+def on_disconnect(client, userdata, rc):
+    print(f"Disconnected with result code {rc}")
+    print("Attempting to reconnect...")
+    # Will automatically try to reconnect
 
 def on_message(client, userdata, msg):
     try:
+        # Update the health monitor
+        if health_monitor:
+            health_monitor.message_received()
+            
         topic = msg.topic
         payload = json.loads(msg.payload.decode())
         current_time = datetime.utcnow().isoformat()
+
+        # Handle GeoJSON data
+        if topic == "symergygrid/geojson":
+            print(f"Received GeoJSON update")
+            # Store the GeoJSON data
+            if "geojson" not in components:
+                components["geojson"] = {
+                    "type": "geojson",
+                    "category": "map",
+                    "name": "Grid GeoJSON",
+                    "data": payload
+                }
+            else:
+                components["geojson"]["data"] = payload
+            
+            measurements["geojson"]["status"].append(True)
+            measurements["geojson"]["timestamps"].append(current_time)
+            return
+
+        # Handle meter structure data
+        if topic == "symergygrid/meterstructure":
+            print(f"Received meter structure update: {payload}")
+            # Store the meter structure data
+            if "meterstructure" not in components:
+                components["meterstructure"] = {
+                    "type": "structure",
+                    "category": "meter",
+                    "name": "Meter Structure",
+                    "coordinates": {"lat": 0, "lon": 0, "alt": 0},
+                    "connections": [],
+                    "structure": payload  # Store the actual structure data
+                }
+            else:
+                components["meterstructure"]["structure"] = payload  # Update existing structure
+            
+            # Update component information from the meter structure
+            if "components" in payload:
+                for component_data in payload["components"]:
+                    component_id = component_data.get("id")
+                    if not component_id:
+                        continue
+                        
+                    # Format the component ID based on its type
+                    if component_data.get("type") == "source":
+                        formatted_id = f"sources/{component_id}"
+                    elif component_data.get("type") == "load":
+                        formatted_id = f"loads/{component_id}"
+                    elif "pole" in component_id:
+                        formatted_id = component_id  # Poles keep their original ID
+                    else:
+                        formatted_id = component_id
+                        
+                    # Create or update the component with data from the meter structure
+                    if formatted_id not in components:
+                        components[formatted_id] = {
+                            "type": component_data.get("type", "unknown"),
+                            "category": component_data.get("category", "unknown"),
+                            "name": component_data.get("name", component_id),
+                            "coordinates": component_data.get("coordinates", {"lat": 0, "lon": 0, "alt": 0}),
+                            "connections": component_data.get("connections", [])
+                        }
+                    else:
+                        # Update existing component with new data
+                        components[formatted_id].update({
+                            "type": component_data.get("type", components[formatted_id].get("type", "unknown")),
+                            "category": component_data.get("category", components[formatted_id].get("category", "unknown")),
+                            "name": component_data.get("name", components[formatted_id].get("name", component_id)),
+                            "coordinates": component_data.get("coordinates", components[formatted_id].get("coordinates", {"lat": 0, "lon": 0, "alt": 0})),
+                            "connections": component_data.get("connections", components[formatted_id].get("connections", []))
+                        })
+            
+            measurements["meterstructure"]["status"].append(True)
+            measurements["meterstructure"]["timestamps"].append(current_time)
+            return
 
         # Handle component measurements
         parts = topic.split('/')
@@ -87,19 +241,72 @@ def on_message(client, userdata, msg):
                     measurements[component_id][measurement_type].append(payload["value"])
                 measurements[component_id]["timestamps"].append(current_time)
                 print(f"Received {measurement_type} for {component_id}: {payload['value']}")
+                
+            # Handle loads (format: symergygrid/components/loads/residential0/status)
+            elif parts[2] == "loads":
+                component_id = f"loads/{parts[3]}"  # e.g., "loads/residential0"
+                measurement_type = parts[4]
+                
+                # Create load component if it doesn't exist
+                if component_id not in components:
+                    # Use the component name for display, but keep original category from MQTT if available
+                    display_name = parts[3].replace('_', ' ').title()
+                    
+                    # Check if category is provided in the payload
+                    category = payload.get("category", "load")
+                    
+                    components[component_id] = {
+                        "type": "load",
+                        "category": category,
+                        "name": display_name,
+                        "coordinates": {"lat": 0, "lon": 0, "alt": 0},
+                        "connections": []
+                    }
+
+                # Store the measurement
+                if measurement_type == "demand":
+                    measurements[component_id]["demand"].append(payload["value"])
+                    measurements[component_id]["current"].append(payload["value"])  # Store in both places
+                else:
+                    measurements[component_id][measurement_type].append(payload["value"])
+                measurements[component_id]["timestamps"].append(current_time)
+                print(f"Received {measurement_type} for {component_id}: {payload['value']}")
 
     except Exception as e:
         print(f"Error processing message: {e}")
 
-# Setup MQTT client with credentials
-mqtt_client = mqtt.Client()
-mqtt_client.username_pw_set("symergyuser", "SymergyRox!")  # Set username and password
+# Load environment variables from .env file
+load_dotenv()
+
+# Setup MQTT client with credentials and better connection handling
+mqtt_client = mqtt.Client(client_id="symergy_server", clean_session=True)
+mqtt_client.username_pw_set(
+    os.getenv("MQTT_USERNAME", "symergyuser"), 
+    os.getenv("MQTT_PASSWORD", "SymergyRox!")
+)
 mqtt_client.on_connect = on_connect
+mqtt_client.on_disconnect = on_disconnect  # Add disconnect handler
 mqtt_client.on_message = on_message
 
 def start_mqtt():
-    mqtt_client.connect("sssn.us", 1883, 60)  # Update to new broker hostname
-    mqtt_client.loop_forever()
+    global health_monitor
+    
+    # Create health monitor
+    health_monitor = HealthMonitor(mqtt_client)
+    health_monitor.start()
+    
+    # Get MQTT connection details from environment variables with fallbacks
+    mqtt_broker = os.getenv("MQTT_BROKER", "sssn.us")
+    mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
+    
+    while True:
+        try:
+            print(f"Connecting to MQTT broker at {mqtt_broker}:{mqtt_port}...")
+            mqtt_client.connect(mqtt_broker, mqtt_port, 60)
+            mqtt_client.loop_forever()
+        except Exception as e:
+            print(f"MQTT connection error: {e}")
+            time.sleep(5)  # Wait before reconnecting
 
 mqtt_thread = Thread(target=start_mqtt)
 mqtt_thread.daemon = True
@@ -107,7 +314,19 @@ mqtt_thread.start()
 
 @app.route('/health')
 def health_check():
-    return jsonify({"status": "healthy"})
+    # Check if we've received any MQTT messages
+    mqtt_connected = mqtt_client.is_connected()
+    last_message_time = health_monitor.last_message_time if health_monitor else 0
+    current_time = time.time()
+    message_age = current_time - last_message_time
+    
+    return jsonify({
+        "status": "ok" if mqtt_connected and message_age < 30 else "degraded",
+        "mqtt_connected": mqtt_connected,
+        "components_count": len(components),
+        "last_message_age": message_age,
+        "server_time": current_time
+    })
 
 @app.route('/api/grid/data')
 def get_grid_data():
