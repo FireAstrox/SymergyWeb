@@ -1,3 +1,30 @@
+/**
+ * MapView page for the Symergy Web application.
+ * Provides an interactive map visualization of the microgrid system with real-time updates.
+ * 
+ * Features:
+ * - Interactive map with OpenStreetMap integration
+ * - Real-time component status visualization
+ * - Voltage-based color coding for connections
+ * - Component categorization with custom icons
+ * - Interactive popups with detailed measurements
+ * - Searchable component list sidebar
+ * - Map legend with component types and voltage levels
+ * - Automatic bounds fitting to system components
+ * 
+ * The map includes several types of components:
+ * - Power Sources (solar, wind, hydro, generators)
+ * - Distribution Network (poles and connections)
+ * - Power Loads (residential, commercial, industrial, municipal)
+ * 
+ * Each component type has:
+ * - Custom styling and icons
+ * - Real-time status monitoring
+ * - Voltage-based color coding
+ * - Detailed measurement popups
+ * - Quick access to component details
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -7,6 +34,7 @@ import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
+// Configure default marker icon for Leaflet
 let DefaultIcon = L.icon({
   iconUrl: icon,
   shadowUrl: iconShadow,
@@ -16,7 +44,10 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Component to fit map to GeoJSON bounds
+/**
+ * Component to automatically fit map bounds to GeoJSON data
+ * Ensures all system components are visible when the map loads
+ */
 const FitBoundsToGeoJSON = ({ geoJsonData }) => {
   const map = useMap();
   const hasZoomed = useRef(false);
@@ -41,7 +72,7 @@ const FitBoundsToGeoJSON = ({ geoJsonData }) => {
   return null;
 };
 
-// Add voltage thresholds
+// Voltage thresholds for status monitoring and color coding
 const VOLTAGE_THRESHOLDS = {
   CRITICAL_HIGH: 132, // >110% (120V + 12V)
   WARNING_HIGH: 126,  // >105% (120V + 6V)
@@ -51,7 +82,10 @@ const VOLTAGE_THRESHOLDS = {
   CRITICAL_LOW: 0     // 0V or disconnected
 };
 
-// Add helper function for voltage color
+/**
+ * Helper function to determine color based on voltage level and online status
+ * Used for both component markers and connection lines
+ */
 const getVoltageColor = (voltage, isOnline) => {
   if (!isOnline) return '#888888'; // Gray for offline
   if (voltage === 0) return '#888888'; // Gray for zero voltage
@@ -64,7 +98,10 @@ const getVoltageColor = (voltage, isOnline) => {
   return '#888888'; // Gray default
 };
 
-// Create a Legend control component
+/**
+ * Map legend component showing component types and voltage levels
+ * Provides visual reference for map elements
+ */
 const MapLegend = () => {
   const map = useMap();
   
@@ -77,6 +114,7 @@ const MapLegend = () => {
     legend.onAdd = function() {
       const div = L.DomUtil.create('div', 'info legend');
       
+      // Legend content with sections for different component types
       div.innerHTML = `
         <div class="legend-container">
           <h4>Map Legend</h4>
@@ -176,7 +214,10 @@ const MapLegend = () => {
   return null;
 };
 
-// Add this component to your MapView
+/**
+ * Reset view button component
+ * Allows users to quickly return to the full system view
+ */
 const ResetViewButton = ({ geoJsonData }) => {
   const map = useMap();
   
@@ -213,7 +254,11 @@ const ResetViewButton = ({ geoJsonData }) => {
   );
 };
 
-// Add this new component to your MapView.jsx file
+/**
+ * Component list sidebar
+ * Provides a searchable list of all system components
+ * Allows quick navigation to specific components
+ */
 const ComponentList = ({ geoJsonData, map }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -258,7 +303,7 @@ const ComponentList = ({ geoJsonData, map }) => {
     setFilteredComponents(filtered);
   }, [searchTerm, geoJsonData]);
   
-  // Handle component selection
+  // Handle component selection and map centering
   const handleComponentClick = (feature) => {
     if (!map || !feature.geometry || !feature.geometry.coordinates) return;
     
@@ -352,7 +397,12 @@ const ComponentList = ({ geoJsonData, map }) => {
   );
 };
 
+/**
+ * Main MapView component
+ * Integrates all map features and handles real-time data updates
+ */
 const MapView = () => {
+  // State management for map data
   const [geoJsonData, setGeoJsonData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [componentData, setComponentData] = useState({});
@@ -361,11 +411,12 @@ const MapView = () => {
   const lastGeoJsonUpdateRef = useRef(null);
   const mapRef = useRef(null);
 
+  // Real-time data fetching with request cancellation
   useEffect(() => {
     let isMounted = true;
     let fetchController = null;
     let lastFetchTime = 0;
-    const FETCH_INTERVAL = 1000; // 1 second - update data every second instead of every minute
+    const FETCH_INTERVAL = 1000; // 1 second
 
     const fetchData = async () => {
       try {
@@ -437,7 +488,7 @@ const MapView = () => {
   const styleFeature = (feature) => {
     if (!feature.properties) return {};
     
-    // Default styles
+    // Default styles for points and lines
     const defaultPointStyle = {
       radius: 8,
       fillColor: "#3388ff",
@@ -453,12 +504,10 @@ const MapView = () => {
       opacity: 0.7
     };
     
-    // For LineString features (connections)
+    // Style connections (LineString features) based on voltage
     if (feature.geometry.type === 'LineString') {
-      // Get the source and target IDs
       const { from, to } = feature.properties;
       
-      // Check if we have measurement data for the source
       if (from && measurementData[from]) {
         const measurements = measurementData[from];
         const lastIndex = measurements.status?.length - 1 || 0;
@@ -466,7 +515,6 @@ const MapView = () => {
         const status = measurements.status?.[lastIndex] ?? false;
         const voltage = measurements.voltage?.[lastIndex] ?? 0;
         
-        // Use voltage to determine line color
         return {
           ...defaultLineStyle,
           color: getVoltageColor(voltage, status),
@@ -477,7 +525,7 @@ const MapView = () => {
       return defaultLineStyle;
     }
     
-    // For Point features (components)
+    // Style components (Point features) based on type and category
     if (feature.geometry.type === 'Point') {
       const { type, category } = feature.properties;
       
@@ -504,14 +552,14 @@ const MapView = () => {
           case 'commercial':
             return { ...defaultPointStyle, fillColor: '#9C27B0' }; // Purple
           case 'industrial':
-            return { ...defaultPointStyle, fillColor: 'rgb(244, 54, 155)' }; // Pink (matching legend)
+            return { ...defaultPointStyle, fillColor: 'rgb(244, 54, 155)' }; // Pink
           case 'municipal':
             return { ...defaultPointStyle, fillColor: '#2196F3' }; // Blue
           default:
             return { ...defaultPointStyle, fillColor: '#FF9800' }; // Orange
         }
       } else if (type === 'none' && category === 'distribution') {
-        // Poles - make them 40% larger (radius 8 * 1.4 = 11.2)
+        // Poles - make them smaller
         return { ...defaultPointStyle, radius: 4.2, fillColor: '#607D8B' }; // Gray
       }
     }
@@ -650,7 +698,7 @@ const MapView = () => {
         }
       }
       
-      // Add a details button that redirects to the component details page with the correct ID format
+      // Add a details button that redirects to the component details page
       const detailsButton = `
         <div class="details-button-container">
           <button onclick="window.location.href='/components/${encodeURIComponent(fullComponentId)}'" class="details-button">
@@ -682,7 +730,7 @@ const MapView = () => {
     }
   };
 
-  // In your MapView component, add this function to split the GeoJSON data
+  // Split GeoJSON data into points and lines for separate rendering
   const splitGeoJSON = (data) => {
     if (!data || !data.features) return { points: null, lines: null };
     
@@ -706,6 +754,7 @@ const MapView = () => {
     };
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen w-screen">
@@ -714,8 +763,10 @@ const MapView = () => {
     );
   }
 
+  // Main map render
   return (
     <div className="map-container">
+      {/* Global styles for map components */}
       <style jsx global>{`
         /* Reset default margins and padding */
         body, html {
@@ -754,7 +805,7 @@ const MapView = () => {
           border-radius: 5px;
           box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
           transition: all 0.3s ease;
-          max-height: calc(100vh - 180px); /* Adjusted to account for new top position */
+          max-height: calc(100vh - 180px);
           display: flex;
           flex-direction: column;
         }

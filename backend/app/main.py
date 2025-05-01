@@ -1,3 +1,20 @@
+"""
+Main backend application for the Symergy Web system.
+This Flask application serves as the central hub for managing and monitoring the microgrid system.
+It handles MQTT communication, data storage, and provides REST API endpoints for the frontend.
+
+Key features:
+- MQTT client for real-time component monitoring
+- Health monitoring system for connection reliability
+- REST API endpoints for frontend data access
+- Component data management and measurement history
+- GeoJSON and meter structure handling
+
+The application maintains two main data structures:
+1. components: Dictionary storing component metadata and configuration
+2. measurements: Dictionary storing time-series data for each component
+"""
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import paho.mqtt.client as mqtt
@@ -13,19 +30,19 @@ from dotenv import load_dotenv
 app = Flask(__name__)
 CORS(app)
 
-# Store component information
+# Store component information and their metadata
 components = {}
-components_loaded = False # Have we loaded the microgrid yet?
+components_loaded = False  # Flag to track if initial microgrid data has been loaded
 
-# Store measurement history for each component
-MAX_HISTORY = 100
+# Store measurement history for each component with a rolling window
+MAX_HISTORY = 100  # Maximum number of measurements to keep in history
 measurements = defaultdict(lambda: {
-    "demand": deque(maxlen=MAX_HISTORY),  # Amps
-    "voltage": deque(maxlen=MAX_HISTORY), # Volts
-    "power": deque(maxlen=MAX_HISTORY),   # kW
-    "energy": deque(maxlen=MAX_HISTORY),  # kWh
-    "status": deque(maxlen=MAX_HISTORY),  # bool
-    "timestamps": deque(maxlen=MAX_HISTORY)
+    "demand": deque(maxlen=MAX_HISTORY),  # Current demand in Amps
+    "voltage": deque(maxlen=MAX_HISTORY), # Voltage readings in Volts
+    "power": deque(maxlen=MAX_HISTORY),   # Power consumption in kW
+    "energy": deque(maxlen=MAX_HISTORY),  # Energy usage in kWh
+    "status": deque(maxlen=MAX_HISTORY),  # Component operational status
+    "timestamps": deque(maxlen=MAX_HISTORY)  # Timestamps for each measurement
 })
 
 # Add this class directly in main.py instead of importing it

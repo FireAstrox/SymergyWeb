@@ -1,12 +1,28 @@
+/**
+ * Components page for the Symergy Web application.
+ * This page displays a list of all system components with their current status and measurements.
+ * 
+ * Features:
+ * - Real-time component data updates
+ * - Searchable component list
+ * - Categorized component display
+ * - Detailed component view integration
+ * 
+ * The page uses a polling mechanism with requestAnimationFrame for smooth updates
+ * and implements request cancellation to prevent memory leaks.
+ */
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, Outlet, useParams } from 'react-router-dom';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 const Components = () => {
+  // State management for components and search
   const [components, setComponents] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const { componentId } = useParams();
 
+  // Real-time data fetching with request cancellation
   useEffect(() => {
     let isMounted = true;
     let fetchController = null;
@@ -86,6 +102,7 @@ const Components = () => {
     
     frameId = requestAnimationFrame(tick);
 
+    // Cleanup function
     return () => {
       isMounted = false;
       if (frameId) {
@@ -97,7 +114,7 @@ const Components = () => {
     };
   }, []);
 
-  // Group and filter components using useMemo
+  // Group and filter components using useMemo for performance
   const filteredGroups = useMemo(() => {
     // First group the components
     const grouped = Object.entries(components).reduce((acc, [id, component]) => {

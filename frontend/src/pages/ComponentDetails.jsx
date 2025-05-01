@@ -1,7 +1,26 @@
+/**
+ * ComponentDetails page for displaying detailed information about a specific system component.
+ * This page shows real-time measurements, historical data, and component status.
+ * 
+ * Features:
+ * - Real-time data updates
+ * - Historical data visualization with charts
+ * - Component status monitoring
+ * - Measurement history with time-series data
+ * - Custom tooltips for data points
+ * 
+ * The page includes several types of measurements:
+ * - Voltage history
+ * - Current history (for non-pole components)
+ * - Power history (for non-pole components)
+ * - Energy history (for non-pole components)
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 
+// Custom tooltip component for chart data points
 const CustomTooltip = ({ active, payload, label, dataKey }) => {
   if (active && payload && payload.length) {
     // Get the appropriate unit based on the data key
@@ -27,12 +46,13 @@ const CustomTooltip = ({ active, payload, label, dataKey }) => {
 };
 
 const ComponentDetails = () => {
+  // State management for component data and loading state
   const { componentId } = useParams();
   const [component, setComponent] = useState(null);
   const [measurements, setMeasurements] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // Fetch component data
+  // Real-time data fetching with request cancellation
   useEffect(() => {
     let isMounted = true;
     let fetchController = null;
@@ -100,7 +120,7 @@ const ComponentDetails = () => {
     };
   }, [componentId]);
   
-  // Format time series data for charts
+  // Format time series data for charts with timezone handling
   const formatTimeSeriesData = useCallback(() => {
     if (!measurements) return [];
     
@@ -180,7 +200,7 @@ const ComponentDetails = () => {
   
   const timeSeriesData = formatTimeSeriesData();
   
-  // Calculate Y-axis domain based on data
+  // Calculate Y-axis domain based on data with intelligent scaling
   const calculateYDomain = useCallback((dataKey, buffer = 0.2) => {
     if (!timeSeriesData || timeSeriesData.length === 0) {
       return [0, 10]; // Default fallback
@@ -258,7 +278,7 @@ const ComponentDetails = () => {
     return [yMin, yMax];
   }, [timeSeriesData]);
   
-  // Get the latest values
+  // Get the latest values for display
   const lastIndex = measurements?.status?.length - 1 || 0;
   const status = measurements?.status?.[lastIndex] ?? false;
   const voltage = measurements?.voltage?.[lastIndex] ?? 0;
@@ -269,13 +289,14 @@ const ComponentDetails = () => {
   // Check if this is a pole component
   const isPole = component?.category === 'pole' || (componentId && componentId.includes('pole'));
   
-  // Format Y-axis tick values
+  // Format Y-axis tick values for better readability
   const formatYAxisTick = (value) => {
     // For values less than 10, show up to 1 decimal place
     // For larger values, show only integers
     return value < 10 ? value.toFixed(1) : Math.round(value);
   };
   
+  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -284,6 +305,7 @@ const ComponentDetails = () => {
     );
   }
   
+  // Error state
   if (!component) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -292,16 +314,18 @@ const ComponentDetails = () => {
     );
   }
   
+  // Main component render
   return (
     <div className="p-6 h-full overflow-y-auto">
-      {/* Header */}
+      {/* Component header */}
       <div className="mb-6 border-b border-yellow-500 pb-4">
         <h1 className="text-2xl font-bold text-navy-900">{component.name}</h1>
       </div>
       
-      {/* Component details */}
+      {/* Component status and measurements */}
       <div className="bg-navy-900 text-white rounded-lg p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Status indicator */}
           <div className="bg-navy-800 p-3 rounded-lg">
             <div className="text-sm text-gray-300">Status</div>
             <div className="flex items-center mt-1">
@@ -309,12 +333,14 @@ const ComponentDetails = () => {
               <span className="text-lg font-semibold">{status ? 'Online' : 'Offline'}</span>
             </div>
           </div>
+          
+          {/* Voltage measurement */}
           <div className="bg-navy-800 p-3 rounded-lg">
             <div className="text-sm text-gray-300">Voltage</div>
             <div className="text-lg font-semibold">{voltage.toFixed(2)} V</div>
           </div>
           
-          {/* Only show current for non-poles */}
+          {/* Current measurement (non-pole components only) */}
           {!isPole && (
             <div className="bg-navy-800 p-3 rounded-lg">
               <div className="text-sm text-gray-300">Current</div>
@@ -322,7 +348,7 @@ const ComponentDetails = () => {
             </div>
           )}
           
-          {/* Only show power for non-poles */}
+          {/* Power measurement (non-pole components only) */}
           {!isPole && (
             <div className="bg-navy-800 p-3 rounded-lg">
               <div className="text-sm text-gray-300">Power</div>
@@ -330,7 +356,7 @@ const ComponentDetails = () => {
             </div>
           )}
           
-          {/* Only show energy for non-poles */}
+          {/* Energy measurement (non-pole components only) */}
           {!isPole && (
             <div className="bg-navy-800 p-3 rounded-lg">
               <div className="text-sm text-gray-300">Energy</div>
@@ -338,6 +364,7 @@ const ComponentDetails = () => {
             </div>
           )}
           
+          {/* Component type and category */}
           <div className="bg-navy-800 p-3 rounded-lg">
             <div className="text-sm text-gray-300">Type</div>
             <div className="text-lg font-semibold capitalize">{component.type} ({component.category})</div>
@@ -345,9 +372,9 @@ const ComponentDetails = () => {
         </div>
       </div>
       
-      {/* Charts */}
+      {/* Historical data charts */}
       <div className="space-y-6">
-        {/* Always show Voltage History */}
+        {/* Voltage history chart */}
         <div className="border border-yellow-500 rounded-lg p-4 bg-white">
           <h3 className="text-lg font-semibold mb-4 text-navy-900">Voltage History</h3>
           <ResponsiveContainer width="100%" height={300}>
@@ -382,9 +409,10 @@ const ComponentDetails = () => {
           </ResponsiveContainer>
         </div>
         
-        {/* Only show Current and Power History for non-poles */}
+        {/* Additional charts for non-pole components */}
         {!isPole && (
           <>
+            {/* Current history chart */}
             <div className="border border-yellow-500 rounded-lg p-4 bg-white">
               <h3 className="text-lg font-semibold mb-4 text-navy-900">Current History</h3>
               <ResponsiveContainer width="100%" height={300}>
@@ -419,6 +447,7 @@ const ComponentDetails = () => {
               </ResponsiveContainer>
             </div>
             
+            {/* Power history chart */}
             <div className="border border-yellow-500 rounded-lg p-4 bg-white">
               <h3 className="text-lg font-semibold mb-4 text-navy-900">Power History</h3>
               <ResponsiveContainer width="100%" height={300}>
@@ -453,6 +482,7 @@ const ComponentDetails = () => {
               </ResponsiveContainer>
             </div>
             
+            {/* Energy history chart */}
             <div className="border border-yellow-500 rounded-lg p-4 bg-white">
               <h3 className="text-lg font-semibold mb-4 text-navy-900">Energy History</h3>
               <ResponsiveContainer width="100%" height={300}>

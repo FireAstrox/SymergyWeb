@@ -1,3 +1,21 @@
+/**
+ * GridVisualization component for displaying system components in a grid layout.
+ * This component handles real-time data fetching and visualization of different
+ * types of components (sources, poles, loads) with their current status and measurements.
+ * 
+ * Features:
+ * - Real-time data updates with requestAnimationFrame
+ * - Component categorization and filtering
+ * - Interactive component cards with detailed information
+ * - Voltage status monitoring with color coding
+ * - Detailed component modal with historical data charts
+ * 
+ * The component uses several sub-components:
+ * - ComponentCard: Displays individual component information
+ * - ComponentDetailModal: Shows detailed component data and charts
+ * - CustomTooltip: Provides formatted tooltips for charts
+ */
+
 import React, { useState, useEffect, memo, useCallback } from 'react';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
@@ -11,7 +29,7 @@ import solarIcon from '../svg/solar.svg';
 import windIcon from '../svg/wind_icon.svg';
 import industrialIcon from '../svg/industrial.svg';
 
-// Add voltage thresholds
+// Voltage thresholds for status monitoring
 const VOLTAGE_THRESHOLDS = {
   CRITICAL_HIGH: 132, // >110% (120V + 12V)
   WARNING_HIGH: 126,  // >105% (120V + 6V)
@@ -21,7 +39,7 @@ const VOLTAGE_THRESHOLDS = {
   CRITICAL_LOW: 0     // 0V or disconnected
 };
 
-// Add helper function for voltage color
+// Helper function to determine voltage status color
 const getVoltageStatusColor = (voltage, isOnline) => {
   if (!isOnline) return 'text-black';
   if (voltage === 0) return 'text-black';
@@ -433,7 +451,7 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
                   filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
                   position: 'absolute',
                   top: '0',
-                  left: '-25%'
+                  left: '-15%'
                 }}
               />
             </div>
