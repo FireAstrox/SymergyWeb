@@ -27,7 +27,7 @@ SymergyWeb consists of two main components:
 - Python (v3.8+)
 - Docker (v20.10+)
 - Docker Compose (v2.0+)
-- MQTT broker (e.g., Mosquitto)
+- MQTT broker (This project uses Mosquitto)
 
 ## Development
 
