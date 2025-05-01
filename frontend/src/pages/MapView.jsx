@@ -746,7 +746,7 @@ const MapView = () => {
         /* Component List Styles */
         .component-list-container {
           position: fixed;
-          top: 160px; /* Positioned below zoom controls */
+          top: 180px; /* Positioned below zoom controls */
           left: 10px;
           z-index: 1000;
           background-color: rgba(25, 32, 71, 0.9);
