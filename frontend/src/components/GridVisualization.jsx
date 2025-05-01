@@ -451,7 +451,7 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
                   filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
                   position: 'absolute',
                   top: '0',
-                  left: '-25%'
+                  left: '-15%'
                 }}
               />
             </div>
@@ -542,7 +542,7 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
                   filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
                   position: 'absolute',
                   top: '0',
-                  left: '-10%'
+                  left: '00%'
                 }}
               />
             </div>
@@ -560,7 +560,7 @@ const ComponentCard = ({ name, status, power, voltage, demand, energy, isPole, c
                   filter: status ? 'brightness(0) invert(1)' : 'brightness(0) invert(0.3)',
                   position: 'absolute',
                   top: '0',
-                  left: '-30%'
+                  left: '-15%'
                 }}
               />
             </div>
