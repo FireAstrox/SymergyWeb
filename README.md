@@ -1,8 +1,9 @@
+![](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdB5pnmbTegv5m-mqhKm2bnjl4osXe0E_cp29gg4ku0bHInhAcRsHsvzeUrU56p_HLYkkTCZgOAOZ7Ws9UjTkus41zw6W-TYkTZK6tmns7-C8i825m-Vx7-eGuW6xdKifPImp5p?key=m95eLiTkQy0GqG0wvsxMFrQe)
 # SymergyWeb - Microgrid Visualization Platform
 
 SymergyWeb is a comprehensive web application for visualizing and monitoring microgrid systems. It provides real-time data visualization of electrical components including power sources, loads, and distribution infrastructure.
 
-![SymergyWeb Dashboard]()
+![SymergyWeb Dashboard](https://lh7-rt.googleusercontent.com/docsz/AD_4nXcLn-UpreVrsxli_n8Wcak2ULt5M_R5DioIipfQYUsfu1eX-DvgI45rkUd3D6fl7sLJpnA4gehRTuga7bTd7yEkghyIByGFSMZwjZthQC5zx9c1yhXW1bvqPDvdBd8KgbflVUXGnw?key=m95eLiTkQy0GqG0wvsxMFrQe)
 
 ## Features
 
